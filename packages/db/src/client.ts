@@ -1,12 +1,12 @@
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
+import { drizzle, type NodePgDatabase, type NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
+import type { PgDatabase } from 'drizzle-orm/pg-core';
 import pg from 'pg';
 
 /**
  * Anything you can run a query on: the database or an open transaction. Repositories accept
  * this so the same code runs inside withTenant's transaction.
  */
-export type DbExecutor = PgDatabase<PgQueryResultHKT, Record<string, unknown>>;
+export type DbExecutor = PgDatabase<NodePgQueryResultHKT, Record<string, unknown>>;
 
 export interface DatabaseOptions {
   /**

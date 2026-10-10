@@ -5,6 +5,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
 
 import { MigrationRoleError } from './errors.js';
+import { assertTenantTablesHaveRls } from './tenancy/rls.js';
 
 /** The single, ordered migrations folder for the whole database (infra + feature tables). */
 export const migrationsFolder = fileURLToPath(new URL('../migrations', import.meta.url));
@@ -27,6 +28,7 @@ export interface MigrateOptions {
  * Direct connection only: the session-level advisory lock below is meaningless through
  * PgBouncer transaction pooling, and DDL must not share pooled server connections.
  * Drizzle applies all pending migrations in one transaction, so a failure leaves nothing half-done.
+ * Afterwards every tenant table must be under forced RLS, or this throws TenantRlsMissingError.
  */
 export async function runMigrations(options: MigrateOptions): Promise<void> {
   const client = new pg.Client({
@@ -41,9 +43,10 @@ export async function runMigrations(options: MigrateOptions): Promise<void> {
 
     await client.query('select pg_advisory_lock($1)', [MIGRATION_LOCK_KEY]);
     try {
-      await migrate(drizzle(client), {
-        migrationsFolder: options.migrationsFolder ?? migrationsFolder,
-      });
+      const db = drizzle(client);
+      await migrate(db, { migrationsFolder: options.migrationsFolder ?? migrationsFolder });
+      // Fail the deploy loudly if any tenant table is not under forced RLS.
+      await assertTenantTablesHaveRls(db);
     } finally {
       await client.query('select pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]);
     }

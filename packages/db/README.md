@@ -67,6 +67,52 @@ const ward = await updateWithVersion(tx, wards, { id, expectedVersion: dto.versi
 // StaleVersionError (code STALE_VERSION) -> 409; RecordNotFoundError (RECORD_NOT_FOUND) -> 404
 ```
 
+## Tenancy: row-level security
+
+Every table with a `tenant_id` is isolated by Postgres RLS. The app role `hims_app` is
+`NOBYPASSRLS` and does not own tables, so it cannot switch RLS off (`row_security = off` errors,
+`ALTER TABLE ... DISABLE ROW LEVEL SECURITY` needs the owner).
+
+### Querying: `withTenant`
+
+```ts
+import { withTenant } from '@hims/db';
+
+const beds = await withTenant(db, { tenantId, branchId, userId }, (tx) =>
+  tx.select().from(wardBeds),
+);
+```
+
+- Opens a transaction and sets `app.tenant_id`, `app.branch_id`, `app.user_id` with
+  `set_config(..., true)` (transaction-local). This is required, not a style choice: PgBouncer in
+  transaction pooling hands the server connection to another client after `COMMIT` and never runs
+  `server_reset_query`, so a session-level `SET` would leak one tenant's context to the next.
+- `tenantId` comes from the resolved hostname + session, never from the request (AGENTS.md rule 1).
+- `branchId` omitted = tenant-wide (all branches); set = confined to that branch on branch-scoped tables.
+- No context = no rows, and every write fails the policy.
+- Malformed ids throw `InvalidTenantContextError` before any query runs.
+
+### Creating a tenant table
+
+1. Define it with `tenantColumns()` or `branchColumns()` and run `db:generate`.
+2. Append the RLS DDL to that migration (drizzle-kit does not emit `FORCE`):
+
+   ```bash
+   pnpm --filter @hims/db db:rls wards --branch
+   ```
+
+   It prints `ENABLE` + `FORCE ROW LEVEL SECURITY` and a `tenant_isolation` policy whose `USING`
+   and `WITH CHECK` are `tenant_id = (select app_current_tenant_id())` (plus the branch condition).
+   The same SQL is available from code as `tenantRlsSql(table, { branchScoped })`.
+
+### Guard (CI + deploy)
+
+`assertTenantTablesHaveRls(db)` fails if any table or partition with a `tenant_id` column lacks
+RLS enabled, forced, or (for non-partitions) a policy. It runs:
+
+- at the end of every `runMigrations()` / `db:migrate`, so a bad migration fails the deploy;
+- in `src/tenancy/rls.int.spec.ts` against all real migrations, so CI fails first.
+
 ## Tests
 
 ```bash

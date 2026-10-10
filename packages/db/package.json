@@ -19,10 +19,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist .turbo",
     "lint": "eslint . --max-warnings=0",
-    "test": "vitest run --project unit --passWithNoTests",
+    "test": "vitest run --project unit",
     "test:int": "vitest run --project integration",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/cli/migrate.ts"
+    "db:migrate": "tsx src/cli/migrate.ts",
+    "db:rls": "tsx src/cli/rls-sql.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",
