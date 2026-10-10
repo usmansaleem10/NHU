@@ -6,3 +6,8 @@ export * from './optimistic-lock.js';
 export * from './tenancy/rls.js';
 export * from './tenancy/with-tenant.js';
 export * from './partitioning/partitions.js';
+export * from './pii/cipher.js';
+export * from './pii/keyring.js';
+export * from './pii/master-key.js';
+export * from './pii/normalise.js';
+export * from './schema/index.js';

@@ -160,6 +160,65 @@ await maintainPartitions(db, ['audit_log', 'domain_events', 'stock_ledger', 'vit
 - Retention (detaching/dropping old partitions) is not built yet: it needs a per-table retention
   policy decision.
 
+## PII encryption at rest + blind indexes
+
+CNIC, phone numbers, photos and thumbprint templates are stored encrypted (AGENTS.md rule 10).
+
+- **Envelope encryption.** Each tenant has its own random 256-bit data key(s) and one HMAC index
+  key in `tenant_keys`, stored only wrapped by a master key. The master key comes from a
+  `MasterKeyProvider`: `LocalMasterKeyProvider.fromEnv()` for dev/tests
+  (`HIMS_MASTER_KEYS="k1:<base64 32 bytes>"`, `HIMS_MASTER_KEY_ID=k1`); production implements the
+  same two-method interface over a cloud KMS so the master key never leaves it.
+- **AES-256-GCM** (node:crypto), random 96-bit IV, authenticated with AAD = tenant + field, so a
+  ciphertext copied to another tenant or column fails to decrypt (`DecryptionError`). Each
+  ciphertext carries its data-key version.
+- **Blind index**: HMAC-SHA256 of the normalised value with the tenant's index key. Exact search
+  only. Per-tenant keys mean the same CNIC has different indexes in different hospitals.
+- **Normalisation** before indexing: CNIC to 13 digits (`normaliseCnic`), phone to E.164 Pakistan
+  (`normalisePkPhone`: `0300-1234567`, `3001234567`, `+92 300 1234567`, `0092...`, landlines).
+  Errors (`InvalidPiiError`) never include the value.
+
+Explicit helpers, not a magic column type: encryption is async (key lookup/unwrap), and Drizzle
+column mappers are synchronous.
+
+```ts
+const patients = pgTable('patients', {
+  ...tenantColumns(),
+  cnicEnc: bytea('cnic_enc'),
+  cnicBidx: bytea('cnic_bidx'), // index (tenant_id, cnic_bidx)
+  phoneEnc: bytea('phone_enc'),
+  phoneBidx: bytea('phone_bidx'),
+});
+
+const keyring = new PiiKeyring(LocalMasterKeyProvider.fromEnv()); // one per process
+
+await withTenant(db, ctx, async (tx) => {
+  const pii = await keyring.forTenant(tx); // creates the tenant's keys on first use
+  const cnic = await pii.protectCnic(dto.cnic); // { encrypted, index }
+  await tx.insert(patients).values({ cnicEnc: cnic.encrypted, cnicBidx: cnic.index, ... });
+
+  const found = await tx.select().from(patients)
+    .where(eq(patients.cnicBidx, await pii.cnicIndex(query))); // exact match, any spelling
+  const plain = await pii.decrypt('cnic', found[0].cnicEnc);  // '3520212345671'
+});
+```
+
+Photos/thumbprints: `pii.encryptBytes('photo', buffer)` (or encrypt before writing to object
+storage). Never log decrypted values or put them in URLs.
+
+### Key rotation
+
+- **Data key** (implemented): `keyring.rotateDataKey(tx)` adds version n+1. New writes use it;
+  old ciphertexts keep decrypting because each names its key version. A background job can then
+  re-encrypt rows still on old versions (decrypt + encrypt) and, once none remain, delete the old
+  key row. Do this on suspected compromise or on a schedule (e.g. yearly).
+- **Master key** (documented, not built): add the new master key to the provider and make it
+  active. Existing tenant keys still unwrap with the old one (`master_key_id` per row). Re-wrap
+  every `tenant_keys` row (unwrap with old, wrap with new; cheap, no PII rows touched) as the
+  owner role, since it spans tenants, then retire the old master key.
+- **Index key**: rotating it means recomputing every blind index from decrypted values (a
+  re-index job), so it is only rotated on compromise.
+
 ## Tenant-isolation test helper (`@hims/db/testing`)
 
 AGENTS.md testing rule 4: every new table or endpoint needs a test proving tenant A cannot read or
