@@ -77,7 +77,7 @@ docs/adr/      architecture decision records
 ```
 
 - **Module format:** `packages/*` and `apps/web` are ESM. `apps/api` is CommonJS (NestJS decorator metadata and circular providers break under ESM), so its tsconfig turns `verbatimModuleSyntax` off. It loads ESM packages through Node 24 `require(esm)`.
-- A feature imports another feature **only through its `index.ts` public API**. Never reach into another feature's repository, tables or components.
+- A feature imports another feature **only through its `index.ts` public API** (`../<feature>` or `@/features/<feature>`). Never reach into another feature's repository, tables, components or any other file. Workspace packages are imported only through their package name and exports, never `@hims/<pkg>/src/...` or `/dist/...`, and never a relative path out of your own `apps/*` or `packages/*` workspace. This also covers `require()`, `import x = require()`, `import('…')` types and `vi.mock`/`vi.importActual`. The ESLint rule `hims/import-boundaries` enforces it and cannot be disabled; if you need something, export it from the feature's `index.ts` or add it to the package's exports.
 - Feature folder names use the ticket's epic (e.g. `C01` → `patient-registration`). Record the mapping in the feature's `index.ts` header comment.
 
 ## Shared UI (`packages/ui`): the rule of two
