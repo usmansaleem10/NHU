@@ -26,6 +26,7 @@
     "db:rls": "tsx src/cli/rls-sql.ts"
   },
   "dependencies": {
+    "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.45.4",
     "pg": "^8.23.1",
     "uuid": "^14.0.3"

@@ -219,6 +219,36 @@ storage). Never log decrypted values or put them in URLs.
 - **Index key**: rotating it means recomputing every blind index from decrypted values (a
   re-index job), so it is only rotated on compromise.
 
+## Money and quantities
+
+`numeric(14,2)` money and `numeric(14,3)` quantities map to `Decimal` (decimal.js), never JS
+`number` (AGENTS.md rule 9).
+
+```ts
+import { money, quantity, roundMoney, toDecimal, decimalFromDb } from '@hims/db';
+
+export const invoiceLines = pgTable('invoice_lines', {
+  ...tenantColumns(),
+  qty: quantity('qty').notNull(),
+  unitPrice: money('unit_price').notNull(),
+  amount: money('amount').notNull(),
+});
+
+const amount = roundMoney(toDecimal(dto.qty).times(dto.unitPrice)); // explicit rounding
+const [{ total }] = await tx
+  .select({ total: sql<string>`sum(${invoiceLines.amount})`.mapWith(decimalFromDb) })
+  .from(invoiceLines);
+```
+
+- Inputs are strings or `Decimal` only (`DecimalInput`); contracts should carry money as decimal
+  strings.
+- Writing a value with more decimal places than the column throws `DecimalValueError` instead of
+  letting Postgres round silently; round explicitly with `roundMoney` / `roundQuantity` (half away
+  from zero, same as Postgres). Overflow of `numeric(14,s)` is rejected too.
+- Why decimal.js over big.js: per-operation rounding modes (half-up, banker's) and richer maths
+  for tax/discount/pro-rata; we use a private `Decimal.clone` so global config can't leak.
+- Raw SQL / aggregates return numeric as strings: `.mapWith(decimalFromDb)`.
+
 ## Tenant-isolation test helper (`@hims/db/testing`)
 
 AGENTS.md testing rule 4: every new table or endpoint needs a test proving tenant A cannot read or

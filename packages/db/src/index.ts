@@ -11,3 +11,4 @@ export * from './pii/keyring.js';
 export * from './pii/master-key.js';
 export * from './pii/normalise.js';
 export * from './schema/index.js';
+export * from './money/decimal.js';
