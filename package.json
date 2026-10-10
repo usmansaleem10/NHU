@@ -14,7 +14,11 @@
     "lint": "turbo run lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "deps:up": "docker compose up -d --wait",
+    "deps:down": "docker compose down",
+    "deps:reset": "docker compose down --volumes",
+    "deps:logs": "docker compose logs -f"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
