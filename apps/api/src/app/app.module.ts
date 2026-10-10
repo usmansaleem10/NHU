@@ -11,6 +11,7 @@ import type { Env } from './config/env';
 import { ENV } from './config/env.token';
 import { ContractModule } from './contract/contract.module';
 import { ProblemDetailsFilter } from './errors/problem.filter';
+import { HealthModule } from './health/health.module';
 import { CursorCodec } from './list/cursor';
 import { createLoggerOptions } from './logging/logger';
 import { MetaController } from './meta/meta.controller';
@@ -37,6 +38,7 @@ export class AppModule {
           pinoHttp: options.logDestination ? [pinoHttp, options.logDestination] : pinoHttp,
         }),
         ContractModule,
+        HealthModule,
         ...(options.imports ?? []),
       ],
       controllers: [MetaController],

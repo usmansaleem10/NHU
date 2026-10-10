@@ -1,3 +1,4 @@
+import { healthContract } from './health/health.contract.js';
 import { metaContract } from './meta/meta.contract.js';
 
 /**
@@ -6,6 +7,7 @@ import { metaContract } from './meta/meta.contract.js';
  * `@Implement(contract.<feature>.<procedure>)` and the web calls it through `createApiClient`.
  */
 export const contract = {
+  health: healthContract,
   meta: metaContract,
 };
 

@@ -25,8 +25,22 @@ export async function createApp(
     // Fastify owns the request id; pino-http and error responses reuse request.id.
     genReqId: (req: IncomingMessage) => resolveRequestId(req.headers[REQUEST_ID_HEADER]),
   });
-  adapter.getInstance().addHook('onRequest', (request, reply, done) => {
+  const fastify = adapter.getInstance();
+  fastify.addHook('onRequest', (request, reply, done) => {
     void reply.header(REQUEST_ID_HEADER, request.id);
+    done();
+  });
+
+  // Graceful drain: once close() starts, Fastify refuses new requests with 503 and waits for
+  // in-flight ones. Responses sent meanwhile carry `Connection: close`, so keep-alive sockets
+  // end with them instead of holding the server open until their idle timeout.
+  let closing = false;
+  fastify.addHook('preClose', (done) => {
+    closing = true;
+    done();
+  });
+  fastify.addHook('onSend', (_request, reply, _payload, done) => {
+    if (closing) void reply.header('connection', 'close');
     done();
   });
 
