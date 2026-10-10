@@ -2,12 +2,13 @@
   "name": "@hims/config",
   "version": "0.0.0",
   "private": true,
-  "description": "Shared tsconfig, ESLint and Vitest presets for every workspace",
+  "description": "Shared tsconfig, ESLint (with the hims/import-boundaries rule) and Vitest presets",
   "type": "module",
   "files": [
     "tsconfig.base.json",
     "eslint-preset.mjs",
-    "vitest-preset.mjs"
+    "vitest-preset.mjs",
+    "src"
   ],
   "exports": {
     "./tsconfig.base.json": "./tsconfig.base.json",
@@ -17,6 +18,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint . --max-warnings=0",
+    "test": "vitest run --project unit --coverage",
     "clean": "rm -rf coverage .turbo"
   },
   "dependencies": {
@@ -27,6 +29,7 @@
     "typescript-eslint": "^8.71.1"
   },
   "devDependencies": {
+    "@types/estree": "^1.0.9",
     "@types/node": "^24.19.2",
     "@vitest/coverage-v8": "^5.0.3",
     "eslint": "^10.12.0",
