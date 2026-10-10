@@ -9,6 +9,7 @@ White-label, multi-tenant Hospital Information & Management System. Every hospit
 - **Roadmap:** [docs/plans/2026-10-10-hims-rebuild-roadmap.md](docs/plans/2026-10-10-hims-rebuild-roadmap.md)
 - **Tickets:** [hims-tickets.csv](hims-tickets.csv). Run `pnpm status` for the current milestone.
 - **Legacy system spec:** [docs/spec/](docs/spec/)
+- **Architecture decisions:** [docs/adr/](docs/adr/) (stack, tenancy, events and finance; new ones from `0000-template.md`)
 
 ## Prerequisites
 
