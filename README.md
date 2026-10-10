@@ -1,7 +1,7 @@
 # HIMS
 
 [![CI](https://github.com/usmansaleem10/NHU/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/usmansaleem10/NHU/actions/workflows/ci.yml?query=branch%3Amain)
-[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fusmansaleem10%2FNHU%2Fcoverage-badge%2Fcoverage.json)](https://github.com/usmansaleem10/NHU/actions/workflows/ci.yml?query=branch%3Amain)
+[![coverage](https://github.com/usmansaleem10/NHU/raw/coverage-badge/coverage.svg)](https://github.com/usmansaleem10/NHU/actions/workflows/ci.yml?query=branch%3Amain)
 
 White-label, multi-tenant Hospital Information & Management System. Every hospital gets its own branded interface from one codebase.
 
@@ -87,6 +87,13 @@ Need plugins or jsdom? `import { vitestConfig } from '@hims/config/vitest'` and 
 
 ### Coverage on GitHub
 
-- Every PR gets a coverage comment: totals, plus the files it touched, with the change against the PR's base commit. The full reports, including each workspace's `lcov.info`, are the `coverage` artifact of the CI run.
-- **The gate:** "Quality gate" fails when a touched `apps/api/src/**/*.service.ts` file has lower line, statement, function or branch coverage than on the base commit. A new service file has no baseline, so it must reach 80% on each. A touched service file that no unit test loads also fails. The logic lives in `packages/config/src/ci/` (`pnpm exec hims-coverage merge|gate|badge`).
-- The badge at the top shows repo-wide line coverage on `main`. CI publishes it to the `coverage-badge` branch and shields.io draws it, so no token or secret is involved.
+- Every PR gets a coverage comment: totals, plus the files it touched, with the change against the PR's base commit. Each CI run also shows the totals in its job summary. The full reports, including each workspace's `lcov.info`, are the `coverage` artifact of the run.
+- **The gate:** "Quality gate" fails on a PR when a touched `apps/api/src/**/*.service.ts` file (renames are followed to their old path):
+  - has lower line, statement, function or branch coverage than on the base commit;
+  - is new (no baseline) and is below 80% on any of those;
+  - has statements but none of them run under the unit tests, whatever the base said;
+  - sits in a workspace that produced no coverage report (usually: no `test` script).
+
+  The base commit is only re-tested when the PR touches such a file. The logic lives in `packages/config/src/ci/` (`pnpm exec hims-coverage merge|touches|gate|badge`).
+- The coverage badge at the top is repo-wide line coverage on `main`. CI writes `coverage.svg` (and a shields.io-style `coverage.json`) to the `coverage-badge` branch. The repo is private, so the badge only renders for signed-in collaborators; no token or third-party service is involved. It reads "unknown" until the first push to `main` produces coverage.
+

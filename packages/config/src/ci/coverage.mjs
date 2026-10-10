@@ -77,37 +77,91 @@ export function rebase(report, fromRoot, toRoot) {
   );
 }
 
+/** @typedef {{ file: string, basePath: string | null }} Change  basePath null = no baseline */
+
+/**
+ * Parse `git diff -M --name-status <base> HEAD`. Modified files keep their path; a rename is
+ * compared against its old path in the base; added and copied files have no baseline;
+ * deleted files are dropped.
+ * @param {string} output
+ * @returns {Change[]}
+ */
+export function parseNameStatus(output) {
+  /** @type {Change[]} */
+  const changes = [];
+  for (const line of output.split('\n')) {
+    const [status = '', first = '', second = ''] = line.split('\t');
+    if (status.startsWith('R')) changes.push({ file: second, basePath: first });
+    else if (status.startsWith('C')) changes.push({ file: second, basePath: null });
+    else if (status === 'A') changes.push({ file: first, basePath: null });
+    else if (status === 'M' || status === 'T') changes.push({ file: first, basePath: first });
+  }
+  return changes;
+}
+
+/**
+ * @param {string} raw `--new-file-min`
+ * @returns {number}
+ */
+export function parseNewFileMinimum(raw) {
+  const value = raw.trim() === '' ? Number.NaN : Number(raw);
+  if (!Number.isFinite(value) || value < 0 || value > 100) {
+    throw new Error(`--new-file-min must be a number from 0 to 100, got "${raw}"`);
+  }
+  return value;
+}
+
+/**
+ * @param {string} raw `--pattern`, a regular expression over repo-relative paths
+ * @returns {RegExp}
+ */
+export function parsePattern(raw) {
+  if (raw === '') throw new Error('--pattern must not be empty');
+  try {
+    return new RegExp(raw);
+  } catch (error) {
+    throw new Error(`--pattern is not a valid regular expression: ${String(error)}`, {
+      cause: error,
+    });
+  }
+}
+
 /**
  * @typedef {{ file: string, reason: 'dropped', metric: Metric, base: number, head: number }
  *   | { file: string, reason: 'new-below-minimum', metric: Metric, head: number, minimum: number }
+ *   | { file: string, reason: 'untested' }
  *   | { file: string, reason: 'not-measured' }} GateFailure
  */
 
 /**
- * Coverage of touched files must not drop below the base branch. A file the base doesn't
- * know has no baseline, so it must reach `newFileMinimum` instead. A touched file missing
- * from the head report was never loaded by a unit-test run, which also fails.
+ * Coverage of touched files must not drop below the base. A file with no baseline (added,
+ * copied, or unknown to the base report) must reach `newFileMinimum` instead. Whatever the
+ * base says, a touched file whose statements never ran fails, and so does one missing from
+ * the head report (its workspace produced no coverage).
  * @param {{
  *   head: Summary,
  *   base: Summary | null,
- *   changedFiles: readonly string[],
+ *   changes: readonly Change[],
  *   root: string,
  *   pattern: RegExp,
  *   newFileMinimum: number,
- * }} input changedFiles are repo-relative; report keys are absolute under `root`
+ * }} input change paths are repo-relative; report keys are absolute under `root`
  * @returns {GateFailure[]}
  */
-export function findCoverageFailures({ head, base, changedFiles, root, pattern, newFileMinimum }) {
+export function findCoverageFailures({ head, base, changes, root, pattern, newFileMinimum }) {
   /** @type {GateFailure[]} */
   const failures = [];
-  for (const file of changedFiles.filter((f) => pattern.test(f))) {
-    const key = path.join(root, file);
-    const now = head[key];
+  for (const { file, basePath } of changes.filter((c) => pattern.test(c.file))) {
+    const now = head[path.join(root, file)];
     if (!now) {
       failures.push({ file, reason: 'not-measured' });
       continue;
     }
-    const before = base?.[key];
+    if (now.statements.total > 0 && now.statements.covered === 0) {
+      failures.push({ file, reason: 'untested' });
+      continue;
+    }
+    const before = basePath === null ? undefined : base?.[path.join(root, basePath)];
     for (const metric of METRICS) {
       if (before) {
         if (now[metric].pct < before[metric].pct) {
@@ -140,17 +194,91 @@ export function describeFailure(failure) {
       return `${failure.metric} coverage dropped from ${String(failure.base)}% to ${String(failure.head)}%`;
     case 'new-below-minimum':
       return `new file: ${failure.metric} coverage ${String(failure.head)}% is below the ${String(failure.minimum)}% minimum for files with no baseline`;
+    case 'untested':
+      return 'no statement in this file runs under the unit tests; add a *.spec.ts that exercises it';
     case 'not-measured':
-      return 'not loaded by any unit-test run (no coverage entry); add a *.spec.ts for it';
+      return "workspace produced no coverage report (no `test` script?); add one running 'vitest run --project unit --coverage'";
   }
 }
 
+/** shields.io named colours, mapped to hex for the self-drawn SVG. */
+const COLORS = /** @type {const} */ ({
+  brightgreen: '#4c1',
+  green: '#97ca00',
+  yellow: '#dfb317',
+  red: '#e05d44',
+  lightgrey: '#9f9f9f',
+});
+
 /**
- * shields.io endpoint payload (https://shields.io/badges/endpoint-badge). CI publishes it to
- * the coverage-badge branch and the README badge reads it, so no token or secret is needed.
- * @param {number} pct
+ * README badge for repo-wide line coverage: a self-contained SVG (the repo is private, so no
+ * third-party service can fetch it) and the same data as a shields.io endpoint payload.
+ * Nothing measured shows "unknown" in grey, never istanbul's 100% for zero lines.
+ * @param {FileCoverage | undefined} total
  */
-export function badgeEndpoint(pct) {
-  const color = pct >= 90 ? 'brightgreen' : pct >= 75 ? 'green' : pct >= 60 ? 'yellow' : 'red';
-  return { schemaVersion: 1, label: 'coverage', message: `${pct.toFixed(1)}%`, color };
+export function badge(total) {
+  const measured = total !== undefined && total.lines.total > 0;
+  const pct = measured ? total.lines.pct : 0;
+  /** @type {keyof typeof COLORS} */
+  const color = !measured
+    ? 'lightgrey'
+    : pct >= 90
+      ? 'brightgreen'
+      : pct >= 75
+        ? 'green'
+        : pct >= 60
+          ? 'yellow'
+          : 'red';
+  const message = measured ? `${pct.toFixed(1)}%` : 'unknown';
+  return {
+    endpoint: { schemaVersion: 1, label: 'coverage', message, color },
+    svg: badgeSvg(message, COLORS[color]),
+  };
+}
+
+/**
+ * Flat, shields-style SVG. Widths approximate Verdana 11px (about 7px per character).
+ * @param {string} message
+ * @param {string} fill
+ */
+function badgeSvg(message, fill) {
+  const labelWidth = 63;
+  const valueWidth = 10 + message.length * 7;
+  const width = labelWidth + valueWidth;
+  const n = (/** @type {number} */ v) => String(v);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${n(width)}" height="20" role="img" aria-label="coverage: ${message}">
+  <title>coverage: ${message}</title>
+  <clipPath id="r"><rect width="${n(width)}" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="${n(labelWidth)}" height="20" fill="#555"/>
+    <rect x="${n(labelWidth)}" width="${n(valueWidth)}" height="20" fill="${fill}"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">
+    <text x="${n(labelWidth / 2)}" y="14">coverage</text>
+    <text x="${n(labelWidth + valueWidth / 2)}" y="14">${message}</text>
+  </g>
+</svg>
+`;
+}
+
+/**
+ * Markdown for $GITHUB_STEP_SUMMARY: repo-wide totals per metric.
+ * @param {FileCoverage | undefined} total
+ */
+export function summaryMarkdown(total) {
+  if (!total || total.lines.total === 0) {
+    return '### Coverage\n\nNo workspace produced a coverage report.\n';
+  }
+  const rows = METRICS.map(
+    (m) =>
+      `| ${m} | ${total[m].pct.toFixed(2)}% | ${String(total[m].covered)} / ${String(total[m].total)} |`,
+  );
+  return [
+    '### Coverage (unit tests, all workspaces)',
+    '',
+    '| Metric | % | Covered / total |',
+    '|---|---|---|',
+    ...rows,
+    '',
+  ].join('\n');
 }

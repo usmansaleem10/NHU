@@ -94,19 +94,25 @@ jobs:
       - name: Integration tests (Testcontainers)
         run: pnpm test:int
 
+      # Badge files (coverage.svg + coverage.json) and the totals table in the job summary.
       - name: Merge coverage reports
         run: |
           pnpm exec hims-coverage merge --out coverage-report/head
-          pnpm exec hims-coverage badge --summary coverage-report/head/coverage-summary.json --out coverage-report/coverage.json
+          pnpm exec hims-coverage badge --summary coverage-report/head/coverage-summary.json --out-dir coverage-report/badge
 
       # The checkout is the PR merge commit, so HEAD^1 is exactly the base the PR is tested on.
-      # If the base can't produce coverage (e.g. it predates `pnpm test`), the gate treats
-      # touched service files as new and holds them to the new-file minimum instead.
+      # The base re-run is skipped when the PR touches no file the gate checks (the same
+      # --pattern default as `gate`). If the base can't produce coverage (e.g. it predates
+      # `pnpm test`), the gate treats touched service files as new files.
       - name: Coverage of the PR base
         if: github.event_name == 'pull_request'
         run: |
           base_sha="$(git rev-parse HEAD^1)"
-          git diff --name-only --diff-filter=AMR "$base_sha" HEAD > coverage-report/changed-files.txt
+          git diff -M --name-status "$base_sha" HEAD > coverage-report/changed-files.txt
+          if ! pnpm exec hims-coverage touches --changed coverage-report/changed-files.txt; then
+            echo "No gated file changed; skipping the base coverage run."
+            exit 0
+          fi
           git worktree add --detach "$RUNNER_TEMP/base" "$base_sha"
           if (cd "$RUNNER_TEMP/base" && pnpm install --frozen-lockfile && pnpm test); then
             pnpm exec hims-coverage merge --root "$RUNNER_TEMP/base" --as-root "$GITHUB_WORKSPACE" --out coverage-report/base
@@ -138,9 +144,11 @@ jobs:
     name: Coverage comment
     needs: quality
     # Fork PRs get a read-only token and can't comment; their gate still runs in "Quality gate".
+    # Dependabot PRs also run with a read-only token.
     if: >-
       !cancelled() && github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -155,7 +163,7 @@ jobs:
           name: coverage
 
       - name: Post coverage summary on the PR
-        if: steps.download.outcome == 'success'
+        if: steps.download.outcome == 'success' && hashFiles('coverage-report/head/coverage-summary.json') != ''
         uses: davelosert/vitest-coverage-report-action@c4bbc33a89b7ace0e63d35f1f7d4bcee31155a73 # v2.13.0
         with:
           name: Unit tests
@@ -171,21 +179,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: write # force-pushes the single-file coverage-badge branch, nothing else
+      contents: write # force-pushes the coverage-badge branch, nothing else
     steps:
       - name: Download coverage
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage
 
-      # An orphan one-commit branch: no history growth, never merged, read by shields.io.
+      # An orphan one-commit branch: no history growth, never merged. The README shows
+      # coverage.svg through github.com/<repo>/raw/..., which works for a private repo
+      # (collaborators are signed in); coverage.json is the shields.io endpoint form.
       - name: Publish badge to the coverage-badge branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir badge && cp coverage-report/coverage.json badge/ && cd badge
+          mkdir badge && cp coverage-report/badge/coverage.svg coverage-report/badge/coverage.json badge/ && cd badge
           git init -q -b coverage-badge
-          git add coverage.json
+          git add coverage.svg coverage.json
           git -c user.name='github-actions[bot]' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
               commit -q -m "chore: coverage badge for ${GITHUB_SHA}"
