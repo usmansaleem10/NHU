@@ -49,8 +49,34 @@ The `hims_app` role is created by `docker/postgres/init/01-roles.sql` the first 
 
 | Command | What it does |
 |---|---|
+| `pnpm dev` | `pnpm deps:up`, then every workspace's `dev` (API + web dev servers) |
 | `pnpm build` | Build every workspace (Turborepo, cached) |
 | `pnpm typecheck` | Type-check every workspace |
 | `pnpm lint` | ESLint (strict, type-checked) |
+| `pnpm test` | Unit tests (`*.spec.ts`) with coverage, per workspace (cached) |
+| `pnpm test:int` | Integration tests (`*.int.spec.ts`) against real Postgres via Testcontainers (needs Docker) |
+| `pnpm test:e2e` | Playwright end-to-end suites (`apps/e2e`) |
+| `pnpm db:generate` | Generate a Drizzle migration from schema changes |
+| `pnpm db:migrate` | Apply migrations (run `pnpm deps:up` first) |
+| `pnpm db:seed` | Migrate, then seed the two demo hospitals |
 | `pnpm format` / `pnpm format:check` | Prettier write / check |
 | `pnpm status` | Milestone status from the ticket CSV |
+
+Every command runs through Turborepo, so a workspace without that script is skipped. `dev`, `test:int`, `test:e2e` and `db:*` are never cached and run with `--env-mode=loose`, so `DATABASE_URL`, Docker and Playwright variables reach them.
+
+### Tests in a workspace
+
+Vitest config is shared through `@hims/config/vitest`. A workspace with tests adds `vitest` and `@vitest/coverage-v8` as devDependencies and needs only:
+
+```ts
+// vitest.config.ts
+export { default } from '@hims/config/vitest';
+```
+
+```jsonc
+// package.json scripts
+"test": "vitest run --project unit --coverage",
+"test:int": "vitest run --project integration"
+```
+
+Need plugins or jsdom? `import { vitestConfig } from '@hims/config/vitest'` and `export default vitestConfig({ ... })`.
