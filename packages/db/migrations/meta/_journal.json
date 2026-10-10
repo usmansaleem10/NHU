@@ -8,6 +8,13 @@
       "when": 1791653114111,
       "tag": "0000_tenancy_context",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791654269000,
+      "tag": "0001_monthly_partitions",
+      "breakpoints": true
     }
   ]
 }

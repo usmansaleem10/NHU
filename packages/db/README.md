@@ -113,6 +113,53 @@ RLS enabled, forced, or (for non-partitions) a policy. It runs:
 - at the end of every `runMigrations()` / `db:migrate`, so a bad migration fails the deploy;
 - in `src/tenancy/rls.int.spec.ts` against all real migrations, so CI fails first.
 
+## Time partitioning (high-volume tables)
+
+`audit_log`, `domain_events`, `stock_ledger`, `vitals`, `invoices` (and any other append-heavy
+table) are range-partitioned by month on a `timestamptz` column, with UTC month bounds.
+
+### Creating one
+
+drizzle-kit cannot emit `PARTITION BY`, so:
+
+1. Define the table in Drizzle for typing. The partition key must be in the primary key:
+   ```ts
+   export const vitals = pgTable(
+     'vitals',
+     { id: uuidV7('id'), tenantId: tenantIdColumn(), recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull(), ... },
+     (t) => [primaryKey({ columns: [t.id, t.recordedAt] })],
+   );
+   ```
+2. Run `db:generate`, then edit the generated `CREATE TABLE` to end with
+   `) PARTITION BY RANGE ("recorded_at");` (drizzle-kit's snapshot ignores partitioning, so later
+   diffs are unaffected). Append `db:rls vitals` output as for any tenant table.
+3. In the same migration, create the first partitions:
+   `SELECT app_ensure_monthly_partitions('vitals', 3);`
+
+No `DEFAULT` partition: a row for a month without a partition fails loudly (SQLSTATE 23514)
+instead of piling into a default partition that later blocks creating that month.
+
+### Scheduled job
+
+```ts
+import { maintainPartitions } from '@hims/db';
+
+// daily BullMQ repeatable job, app-role database (not a transaction):
+await maintainPartitions(db, ['audit_log', 'domain_events', 'stock_ledger', 'vitals', 'invoices']);
+```
+
+- Calls `app_ensure_monthly_partitions(table, 3)`: creates the current month + 3 ahead, skips
+  existing ones (idempotent, safe to run concurrently). It is `SECURITY DEFINER`, so the job runs as
+  `hims_app` and needs no owner credentials; it only accepts tables range-partitioned on one
+  `timestamptz`/`date` column.
+- Then re-checks coverage (`missingMonthlyPartitions`). Any failure throws
+  `PartitionMaintenanceError` listing every failed table, after trying all of them. Wire the job's
+  failed event to alerting (jobs track); with 3 months of headroom there is time to react.
+- New partitions get RLS enabled + forced with no policy. Through the parent, the parent's tenant
+  policy applies; a partition queried directly by name returns nothing.
+- Retention (detaching/dropping old partitions) is not built yet: it needs a per-table retention
+  policy decision.
+
 ## Tenant-isolation test helper (`@hims/db/testing`)
 
 AGENTS.md testing rule 4: every new table or endpoint needs a test proving tenant A cannot read or
