@@ -35,9 +35,10 @@ New work found along the way goes in as a new row with the next ID in that epic.
 
 | Layer | Choice |
 |---|---|
-| Language | TypeScript `strict` everywhere (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`) |
+| Runtime | Node 24 (`.nvmrc`); pnpm 10 via `packageManager` |
+| Language | TypeScript 6.0.x (`~6.0`), `strict` everywhere (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`). Not 7.x: typescript-eslint supports only `<6.1` |
 | Repo | **Monorepo** with pnpm workspaces + **Turborepo**. We can split later; until then, everything lives here |
-| API | Node 22, NestJS on the Fastify adapter |
+| API | NestJS on the Fastify adapter |
 | Contracts | Zod schemas in `packages/contracts`, shared by API and web; typed client generated from them |
 | DB | PostgreSQL 17, Drizzle ORM + drizzle-kit migrations, PgBouncer |
 | Jobs/cache | Redis + BullMQ |
@@ -75,6 +76,7 @@ docs/plans/    roadmap and phase plans
 docs/adr/      architecture decision records
 ```
 
+- **Module format:** `packages/*` and `apps/web` are ESM. `apps/api` is CommonJS (NestJS decorator metadata and circular providers break under ESM), so its tsconfig turns `verbatimModuleSyntax` off. It loads ESM packages through Node 24 `require(esm)`.
 - A feature imports another feature **only through its `index.ts` public API**. Never reach into another feature's repository, tables or components.
 - Feature folder names use the ticket's epic (e.g. `C01` → `patient-registration`). Record the mapping in the feature's `index.ts` header comment.
 
@@ -179,3 +181,14 @@ pnpm db:seed        # two demo hospitals on demo-a.localhost / demo-b.localhost
 - [ ] Coverage report posted on the PR and not lower for touched service files
 - [ ] `/code-review` run and findings resolved
 - [ ] Ticket row updated (`Done = TRUE`, notes). Sign-off is left to the department owner.
+
+<!-- BEGIN:turborepo-agent-rules -->
+
+# This is NOT the Turborepo you know
+
+Turborepo configuration, task behavior, and CLI commands can vary between installed versions and may differ from your training data. Resolve the `turbo` package from this file's directory or relevant workspace; in monorepos, it may not be visible from the repository root. For example, run `node -p "require.resolve('turbo/package.json')"` from a workspace that depends on `turbo`.
+
+Read `docs/README.md` inside that installed package first, then read the relevant pages from its `docs/` directory before changing Turborepo configuration or commands. Heed deprecation notices. These bundled docs match the installed package version and are available without network access.
+
+This block is written and re-added by `turbo` before repository-scoped commands when an AI agent is detected. In the Turborepo source repository, its template is defined in `crates/turborepo-cli/src/cli/agent_guidance.rs`. Removing the managed block while updates are enabled means a later qualifying invocation will add it again. Set `"agentGuidance": false` in the root `turbo.json` or `turbo.jsonc` to opt out; this does not remove an existing block. Keep the block committed with your work to avoid an uncommitted change on the next agent invocation.
+<!-- END:turborepo-agent-rules -->

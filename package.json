@@ -1,0 +1,19 @@
+{
+  "name": "hims",
+  "private": true,
+  "description": "White-label multi-tenant Hospital Information & Management System",
+  "packageManager": "pnpm@10.11.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "status": "python3 scripts/status.py"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.7",
+    "typescript": "~6.0.3"
+  }
+}
