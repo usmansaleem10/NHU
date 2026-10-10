@@ -1,5 +1,8 @@
 # HIMS
 
+[![CI](https://github.com/usmansaleem10/NHU/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/usmansaleem10/NHU/actions/workflows/ci.yml?query=branch%3Amain)
+[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fusmansaleem10%2FNHU%2Fcoverage-badge%2Fcoverage.json)](https://github.com/usmansaleem10/NHU/actions/workflows/ci.yml?query=branch%3Amain)
+
 White-label, multi-tenant Hospital Information & Management System. Every hospital gets its own branded interface from one codebase.
 
 - **Agent and contributor rules:** [AGENTS.md](AGENTS.md)
@@ -80,3 +83,9 @@ export { default } from '@hims/config/vitest';
 ```
 
 Need plugins or jsdom? `import { vitestConfig } from '@hims/config/vitest'` and `export default vitestConfig({ ... })`.
+
+### Coverage on GitHub
+
+- Every PR gets a coverage comment: totals, plus the files it touched, with the change against the PR's base commit. The full reports, including each workspace's `lcov.info`, are the `coverage` artifact of the CI run.
+- **The gate:** "Quality gate" fails when a touched `apps/api/src/**/*.service.ts` file has lower line, statement, function or branch coverage than on the base commit. A new service file has no baseline, so it must reach 80% on each. A touched service file that no unit test loads also fails. The logic lives in `packages/config/src/ci/` (`pnpm exec hims-coverage merge|gate|badge`).
+- The badge at the top shows repo-wide line coverage on `main`. CI publishes it to the `coverage-badge` branch and shields.io draws it, so no token or secret is involved.
