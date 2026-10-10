@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    // The presets and tools ship as JSDoc-typed .mjs (loaded by ESLint/Vitest/Node without a
+    // build step); checkJs keeps them under the same strict type-check as TypeScript.
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["*.mjs", "vitest.config.ts", "src"]
+}
