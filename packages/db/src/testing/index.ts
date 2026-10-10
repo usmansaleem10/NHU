@@ -2,3 +2,4 @@
 // @testcontainers/postgresql and drizzle-kit (devDependencies of the consuming package).
 export * from './postgres.js';
 export * from './pg-error.js';
+export * from './tenant-isolation.js';

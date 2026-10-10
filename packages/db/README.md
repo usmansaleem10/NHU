@@ -113,6 +113,51 @@ RLS enabled, forced, or (for non-partitions) a policy. It runs:
 - at the end of every `runMigrations()` / `db:migrate`, so a bad migration fails the deploy;
 - in `src/tenancy/rls.int.spec.ts` against all real migrations, so CI fails first.
 
+## Tenant-isolation test helper (`@hims/db/testing`)
+
+AGENTS.md testing rule 4: every new table or endpoint needs a test proving tenant A cannot read or
+write tenant B's data. Use these instead of hand-rolling it. Add `@testcontainers/postgresql` and
+`drizzle-kit` as devDependencies of the consuming package.
+
+```ts
+import {
+  assertTableTenantIsolation,
+  assertTenantIsolation,
+  createTables,
+  startTestDatabase,
+} from '@hims/db/testing';
+import { createDatabase, tenantRlsSql } from '@hims/db';
+
+const pgc = await startTestDatabase(); // postgres:17.11 + hims/hims_app roles + all migrations
+// Feature tables already in migrations need nothing more; ad-hoc fixtures:
+await createTables(pgc.ownerUrl, { wards }, tenantRlsSql(wards, { branchScoped: true }));
+const app = createDatabase({ connectionString: pgc.appUrl }); // ALWAYS the app role
+
+// Table level: cross-tenant read/update/delete, insert-for-other-tenant, move-to-other-tenant,
+// and no access without context.
+await assertTableTenantIsolation({
+  db: app.db,
+  table: wards,
+  values: () => ({ name: 'Ward 1' }),
+  change: { name: 'hijacked' },
+});
+
+// Repository / service level: pass your own operations. Thrown errors count as "denied";
+// the helper checks the record's actual state as its owner afterwards.
+await assertTenantIsolation({
+  db: app.db,
+  create: async (tx) => (await wardsRepository.create(tx, { name: 'W' })).id,
+  read: (tx, id) => wardsRepository.findById(tx, id),
+  update: (tx, id) => wardsRepository.rename(tx, id, 1, 'hijacked'),
+  remove: (tx, id) => wardsRepository.remove(tx, id),
+});
+```
+
+Failures throw `node:assert` `AssertionError`, so it works under any test runner. Every
+operation also receives the acting `TenantContext`, so endpoint tests (API track) can ignore `tx`
+and call HTTP routes with that tenant's session instead. `pgErrorOf(promise)` unwraps Drizzle's error to the Postgres
+SQLSTATE (`RLS_VIOLATION = '42501'`).
+
 ## Tests
 
 ```bash
