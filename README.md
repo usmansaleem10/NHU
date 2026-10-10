@@ -66,7 +66,7 @@ The `hims_app` role is created by `docker/postgres/init/01-roles.sql` the first 
 | `pnpm format` / `pnpm format:check` | Prettier write / check |
 | `pnpm status` | Milestone status from the ticket CSV |
 
-Every command runs through Turborepo, so a workspace without that script is skipped. `dev`, `test:int`, `test:e2e` and `db:*` are never cached and run with `--env-mode=loose`, so `DATABASE_URL`, Docker and Playwright variables reach them.
+Every command runs through Turborepo, so a workspace without that script is skipped. Turbo runs tasks in strict env mode: a task sees only the variables `turbo.json` lets through. `dev`, `test:int`, `test:e2e` and `db:*` are never cached and declare `passThroughEnv` (e.g. `DATABASE_*`, `REDIS_*`, `DOCKER_*`, `TESTCONTAINERS_*`, `PLAYWRIGHT_*`). If a task needs a new variable, add it there.
 
 ### Tests in a workspace
 
