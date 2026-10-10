@@ -29,6 +29,17 @@ ruleTester.run('hims/import-boundaries', importBoundaries, {
     { filename: inFeatureA, code: "import { hims } from '@hims/config/eslint';" },
     // Bare npm paths that merely contain "features/" are not ours.
     { filename: inFeatureA, code: "import 'core-js/features/array/at';" },
+    // Every import form is fine when it targets a public entry or the same feature.
+    { filename: inFeatureA, code: 'const m = await import(`../../billing`);' },
+    { filename: inFeatureA, code: "import billing = require('../../billing');" },
+    { filename: inFeatureA, code: "type T = import('../hooks/use-form').Hook;" },
+    { filename: inFeatureA, code: "const b = require('../../billing');" },
+    { filename: inFeatureA, code: "vi.mock('../hooks/use-form');" },
+    // Dynamic template literals can't be checked statically; other calls are not imports.
+    { filename: inFeatureA, code: 'const m = await import(`../../${name}/internal`);' },
+    { filename: inFeatureA, code: "logger.mock('../../billing/internal');" },
+    // Relative paths that stay inside the workspace.
+    { filename: `${web}/app/router.tsx`, code: "import { env } from '../../vite.config';" },
   ],
   invalid: [
     {
@@ -71,6 +82,48 @@ ruleTester.run('hims/import-boundaries', importBoundaries, {
       filename: inFeatureA,
       code: "import { schema } from '@hims/contracts/dist/patients.js';",
       errors: [{ messageId: 'package' }],
+    },
+    // Other import forms reaching into another feature.
+    {
+      filename: inFeatureA,
+      code: 'const m = await import(`../../billing/internal`);',
+      errors: [{ messageId: 'feature' }],
+    },
+    {
+      filename: '/repo/apps/api/src/features/billing/billing.service.ts',
+      code: "import repo = require('../patients/patients.repository');",
+      errors: [{ messageId: 'feature' }],
+    },
+    {
+      filename: inFeatureA,
+      code: "type Invoice = import('../../billing/api').Invoice;",
+      errors: [{ messageId: 'feature' }],
+    },
+    {
+      filename: '/repo/apps/api/src/features/billing/billing.service.ts',
+      code: "const repo = require('../patients/patients.repository');",
+      errors: [{ messageId: 'feature' }],
+    },
+    {
+      filename: '/repo/apps/api/src/features/billing/billing.service.spec.ts',
+      code: "vi.mock('../patients/patients.repository');",
+      errors: [{ messageId: 'feature' }],
+    },
+    {
+      filename: '/repo/apps/api/src/features/billing/billing.service.spec.ts',
+      code: "const real = await vi.importActual('../patients/patients.repository');",
+      errors: [{ messageId: 'feature' }],
+    },
+    // Relative paths that leave the importing workspace (apps/* or packages/*).
+    {
+      filename: inFeatureA,
+      code: "import { Button } from '../../../../../../packages/ui/src/button';",
+      errors: [{ messageId: 'workspace' }],
+    },
+    {
+      filename: '/repo/packages/db/src/client.ts',
+      code: "import { API_VERSION } from '../../contracts/src/index.js';",
+      errors: [{ messageId: 'workspace' }],
     },
   ],
 });
