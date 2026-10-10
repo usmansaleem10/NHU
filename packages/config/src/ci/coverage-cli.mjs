@@ -4,20 +4,36 @@
 //   hims-coverage merge --root <checkout> [--as-root <dir>] --out <dir>
 //       Merge every {apps,packages}/*/coverage/coverage-{summary,final}.json into <dir>.
 //       --as-root re-keys file paths (used for the PR-base checkout so keys match the head).
-//   hims-coverage gate --head <summary.json> [--base <summary.json>] --changed <list.txt>
-//                      [--root <checkout>] [--pattern <regex>] [--new-file-min <pct>]
+//   hims-coverage touches --changed <name-status.txt> [--pattern <regex>]
+//       Exit 0 if a changed file matches --pattern, 1 if none does (CI skips the base run).
+//   hims-coverage gate --head <summary.json> [--base <summary.json>] --changed <name-status.txt>
+//                      [--root <checkout>] [--pattern <regex>] [--new-file-min <0-100>]
 //       Exit 1 if a touched file matching --pattern lost coverage versus the base.
-//   hims-coverage badge --summary <summary.json> --out <coverage.json>  (shields.io endpoint)
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+//       <name-status.txt> is `git diff -M --name-status <base> HEAD` (renames are followed).
+//   hims-coverage badge --summary <summary.json> --out-dir <dir>
+//       Write coverage.svg and coverage.json (shields.io endpoint); append totals to
+//       $GITHUB_STEP_SUMMARY when it is set.
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
 import {
-  badgeEndpoint,
+  badge,
   describeFailure,
   findCoverageFailures,
   mergeSummaries,
+  parseNameStatus,
+  parseNewFileMinimum,
+  parsePattern,
   rebase,
+  summaryMarkdown,
 } from './coverage.mjs';
 
 /** @typedef {import("./coverage.mjs").Summary} Summary */
@@ -58,6 +74,7 @@ const { values } = parseArgs({
     root: { type: 'string', default: process.cwd() },
     'as-root': { type: 'string' },
     out: { type: 'string' },
+    'out-dir': { type: 'string' },
     head: { type: 'string' },
     base: { type: 'string' },
     changed: { type: 'string' },
@@ -67,6 +84,8 @@ const { values } = parseArgs({
   },
 });
 const root = path.resolve(values.root);
+const pattern = parsePattern(values.pattern);
+const changes = () => parseNameStatus(readFileSync(required(values, 'changed'), 'utf8'));
 
 switch (command) {
   case 'merge': {
@@ -82,20 +101,23 @@ switch (command) {
     console.log(`Merged ${String(summaries.length)} workspace coverage report(s) into ${out}`);
     break;
   }
+  case 'touches': {
+    const touched = changes().filter((c) => pattern.test(c.file));
+    console.log(`${String(touched.length)} changed file(s) match ${values.pattern}`);
+    process.exitCode = touched.length > 0 ? 0 : 1;
+    break;
+  }
   case 'gate': {
+    const newFileMinimum = parseNewFileMinimum(values['new-file-min']);
     const basePath = values.base;
     const base = basePath && existsSync(basePath) ? readSummary(basePath) : null;
-    const changedFiles = readFileSync(required(values, 'changed'), 'utf8')
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
     const failures = findCoverageFailures({
       head: readSummary(required(values, 'head')),
       base,
-      changedFiles,
+      changes: changes(),
       root,
-      pattern: new RegExp(values.pattern),
-      newFileMinimum: Number(values['new-file-min']),
+      pattern,
+      newFileMinimum,
     });
     if (!base) console.log('No base coverage report: touched files are treated as new.');
     for (const failure of failures) {
@@ -114,15 +136,19 @@ switch (command) {
   }
   case 'badge': {
     const total = readSummary(required(values, 'summary'))['total'];
-    if (!total) throw new Error('summary has no "total" entry');
-    const out = required(values, 'out');
-    writeJson(out, badgeEndpoint(total.lines.pct));
-    console.log(`Wrote ${out} (${String(total.lines.pct)}% lines)`);
+    const outDir = required(values, 'out-dir');
+    const { endpoint, svg } = badge(total);
+    mkdirSync(outDir, { recursive: true });
+    writeFileSync(path.join(outDir, 'coverage.svg'), svg);
+    writeJson(path.join(outDir, 'coverage.json'), endpoint);
+    const stepSummary = process.env['GITHUB_STEP_SUMMARY'];
+    if (stepSummary) appendFileSync(stepSummary, summaryMarkdown(total));
+    console.log(`Wrote coverage.svg and coverage.json to ${outDir} (${endpoint.message})`);
     break;
   }
   default:
     console.error(
-      'Usage: hims-coverage <merge|gate|badge> [options] (see header of coverage-cli.mjs)',
+      'Usage: hims-coverage <merge|touches|gate|badge> [options] (see header of coverage-cli.mjs)',
     );
     process.exitCode = 2;
 }
