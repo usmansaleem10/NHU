@@ -73,6 +73,17 @@ describe('problem+json responses', () => {
     });
   });
 
+  it('keeps query-string PII out of error responses', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/nope?cnic=35202-1234567-1&phone=03001234567',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.body).not.toContain('35202-1234567-1');
+    expect(response.body).not.toContain('03001234567');
+  });
+
   it('answers malformed JSON bodies with a 400 problem', async () => {
     const response = await app.inject({
       method: 'POST',

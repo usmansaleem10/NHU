@@ -3,6 +3,11 @@ import type { FieldError, ProblemKind } from '@hims/contracts';
 export interface DomainErrorOptions {
   /** Extra RFC 9457 extension members safe to show the client (never PII). */
   extensions?: Readonly<Record<string, unknown>>;
+  /**
+   * 5xx details and extensions are withheld from clients by default (they tend to describe
+   * infrastructure). Set when the message is deliberately written for API consumers.
+   */
+  public?: boolean;
   cause?: unknown;
 }
 
@@ -13,6 +18,7 @@ export interface DomainErrorOptions {
 export abstract class DomainError extends Error {
   abstract readonly kind: ProblemKind;
   readonly extensions: Readonly<Record<string, unknown>>;
+  readonly isPublic: boolean;
 
   /**
    * @param code stable machine-readable code, `<area>.<rule>` (e.g. `patient.not_found`);
@@ -27,6 +33,7 @@ export abstract class DomainError extends Error {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
     this.name = new.target.name;
     this.extensions = options.extensions ?? {};
+    this.isPublic = options.public ?? false;
   }
 }
 

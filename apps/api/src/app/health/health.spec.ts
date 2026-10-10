@@ -41,7 +41,7 @@ describe('health endpoints', () => {
     expect(response.json()).toMatchObject({ status: 'ok', checks: { redis: { status: 'up' } } });
   });
 
-  it('GET /api/v1/health/ready is a 503 problem listing the failed check', async () => {
+  it('GET /api/v1/health/ready is a 503 problem that does not reveal dependencies', async () => {
     redisUp = false;
 
     const response = await app.inject({ method: 'GET', url: '/api/v1/health/ready' });
@@ -51,7 +51,7 @@ describe('health endpoints', () => {
     expect(response.json()).toMatchObject({
       type: 'urn:hims:problem:unavailable',
       code: 'health.not_ready',
-      checks: { redis: { status: 'down' } },
     });
+    expect(response.body).not.toContain('redis');
   });
 });

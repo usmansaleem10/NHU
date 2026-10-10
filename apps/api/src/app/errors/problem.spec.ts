@@ -28,7 +28,11 @@ describe('toProblem: domain errors', () => {
       422,
       'business-rule',
     ],
-    [new ServiceUnavailableError('health.not_ready', 'Not ready'), 503, 'unavailable'],
+    [
+      new ServiceUnavailableError('sms.gateway_down', 'Not ready', { public: true }),
+      503,
+      'unavailable',
+    ],
   ] as const)('maps %o to %i', (error, status, kind: ProblemKind) => {
     expect(toProblem(error)).toEqual({
       type: `urn:hims:problem:${kind}`,
@@ -64,7 +68,42 @@ describe('toProblem: domain errors', () => {
   });
 });
 
+describe('toProblem: 5xx disclosure', () => {
+  it('drops detail and extensions of 5xx domain errors unless marked public', () => {
+    const error = new ServiceUnavailableError('payments.gateway_down', 'pg-primary:5432 refused', {
+      extensions: { host: 'pg-primary' },
+    });
+
+    expect(toProblem(error)).toEqual({
+      type: 'urn:hims:problem:unavailable',
+      title: 'Service unavailable',
+      status: 503,
+      code: 'payments.gateway_down',
+    });
+  });
+
+  it('keeps detail and extensions of a 5xx error explicitly marked public', () => {
+    const error = new ServiceUnavailableError('fbr.offline', 'FBR invoicing is offline', {
+      public: true,
+      extensions: { retryAfterSeconds: 60 },
+    });
+
+    expect(toProblem(error)).toMatchObject({
+      detail: 'FBR invoicing is offline',
+      retryAfterSeconds: 60,
+    });
+  });
+});
+
 describe('toProblem: framework and unknown errors', () => {
+  it('never echoes the query string of the request URL', () => {
+    const problem = toProblem(
+      new NotFoundException('Cannot GET /api/v1/patients?cnic=35202-1234567-1&phone=03001234567'),
+    );
+
+    expect(problem.detail).toBe('Cannot GET /api/v1/patients');
+  });
+
   it('maps a Nest HttpException using the RFC 9457 about:blank convention', () => {
     expect(toProblem(new NotFoundException('Cannot GET /api/v1/nope'))).toEqual({
       type: 'about:blank',

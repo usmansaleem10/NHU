@@ -33,6 +33,9 @@ function httpProblem(status: number, detail: string): ProblemDetails {
 }
 
 function domainProblem(error: DomainError): ProblemDetails {
+  if (PROBLEM_KINDS[error.kind].status >= 500 && !error.isPublic) {
+    return kindProblem(error.kind, error.code);
+  }
   const problem = kindProblem(error.kind, error.code, error.message);
   const errors = error instanceof ValidationError && error.errors.length > 0 ? error.errors : [];
   // Extensions go first so they can never override the standard members.
@@ -92,7 +95,8 @@ export function toProblem(error: unknown): ProblemDetails {
 
   const status = clientErrorStatus(error);
   if (status !== undefined && status >= 400 && status < 500 && error instanceof Error) {
-    return httpProblem(status, error.message);
+    // Framework messages may echo the request URL; never echo its query string.
+    return httpProblem(status, error.message.replace(/\?\S*/g, ''));
   }
   return { ...INTERNAL };
 }
