@@ -18,6 +18,7 @@ export function hims({ rootDir }) {
         '**/coverage/**',
         '**/.turbo/**',
         '**/node_modules/**',
+        '.claude/**',
         'docs/**',
         'scripts/**',
       ],
@@ -58,6 +59,15 @@ export function hims({ rootDir }) {
         // AGENTS.md "Repo layout": another feature only via its index.ts, a workspace
         // package only via its exports (no @hims/<pkg>/src/...). Not disableable.
         'hims/import-boundaries': 'error',
+        // AGENTS.md rule 9: money is a Decimal (@hims/db), never a JS number.
+        'no-restricted-syntax': [
+          'error',
+          ...['TSPropertySignature', 'PropertyDefinition'].map((node) => ({
+            selector: `${node}[key.name=/(amount|price|balance|cost|fee|tax|discount|paid|due|money)$/i] > TSTypeAnnotation > TSNumberKeyword`,
+            message:
+              'Money is a Decimal (@hims/db) or a decimal string in contracts, never number.',
+          })),
+        ],
       },
     },
     // Plain JS config files (eslint/commitlint/lint-staged configs) have no tsconfig.
