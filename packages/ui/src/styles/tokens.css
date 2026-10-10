@@ -1,0 +1,95 @@
+/*
+ * HIMS design tokens: the ONLY file in packages/ui or apps/web allowed to hold raw colour values
+ * (enforced by scripts/check-css-colours.mjs and the hims/no-raw-colours ESLint rule).
+ *
+ * Components consume these through Tailwind utilities mapped in theme.css (bg-primary,
+ * text-muted-foreground, ...). Tenant theming (F0-TEN-05) overrides the same variables at runtime
+ * with buildThemeCss() from src/theme, so re-branding a hospital is a variable swap, never a code
+ * change. Token names are listed in src/theme/tokens.ts; keep the two in sync.
+ */
+:root {
+  color-scheme: light;
+
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+
+  --primary: #1e40af;
+  --primary-foreground: #ffffff;
+  --secondary: #e2e8f0;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --accent: #e0e7ff;
+  --accent-foreground: #1e3a8a;
+
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+  --info: #0369a1;
+  --info-foreground: #ffffff;
+
+  --border: #e2e8f0;
+  --input: #cbd5e1;
+  --ring: #2563eb;
+  --overlay: rgb(15 23 42 / 0.5);
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-muted-foreground: #64748b;
+  --sidebar-accent: #eef2ff;
+  --sidebar-accent-foreground: #1e3a8a;
+  --sidebar-border: #e2e8f0;
+
+  --radius: 0.5rem;
+  --font-sans:
+    'Segoe UI', system-ui, -apple-system, 'Noto Sans', 'Noto Nastaliq Urdu', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: #0b1120;
+  --foreground: #e2e8f0;
+  --card: #111827;
+  --card-foreground: #e2e8f0;
+  --popover: #111827;
+  --popover-foreground: #e2e8f0;
+
+  --primary: #60a5fa;
+  --primary-foreground: #0b1120;
+  --secondary: #1e293b;
+  --secondary-foreground: #e2e8f0;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #1e293b;
+  --accent-foreground: #e2e8f0;
+
+  --destructive: #f87171;
+  --destructive-foreground: #0b1120;
+  --success: #4ade80;
+  --success-foreground: #0b1120;
+  --warning: #fbbf24;
+  --warning-foreground: #0b1120;
+  --info: #38bdf8;
+  --info-foreground: #0b1120;
+
+  --border: #1f2937;
+  --input: #334155;
+  --ring: #60a5fa;
+  --overlay: rgb(0 0 0 / 0.6);
+
+  --sidebar: #0f172a;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-muted-foreground: #94a3b8;
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #f8fafc;
+  --sidebar-border: #1f2937;
+}
