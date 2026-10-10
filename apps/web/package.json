@@ -1,0 +1,19 @@
+{
+  "name": "@hims/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "HIMS web app (React + Vite from F0-UI-01)",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@hims/contracts": "workspace:*",
+    "@hims/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@hims/config": "workspace:*"
+  }
+}

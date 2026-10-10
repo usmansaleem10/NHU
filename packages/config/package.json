@@ -1,0 +1,12 @@
+{
+  "name": "@hims/config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared tsconfig (and later eslint/tailwind presets) for every workspace",
+  "files": [
+    "tsconfig.base.json"
+  ],
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json"
+  }
+}
