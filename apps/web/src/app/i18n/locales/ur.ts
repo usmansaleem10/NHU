@@ -1,0 +1,15 @@
+import type { AppMessages } from './en';
+
+/** Urdu catalogue. Keys missing here fall back to English. */
+export const ur: Partial<AppMessages> = {
+  'app.name': 'HIMS',
+  'app.skipToContent': 'مرکزی مواد پر جائیں',
+  'app.loadingScreen': 'اسکرین لوڈ ہو رہی ہے…',
+  'app.notFoundTitle': 'صفحہ نہیں ملا',
+  'app.notFoundBody': 'آپ کا کھولا گیا صفحہ موجود نہیں یا منتقل ہو چکا ہے۔',
+  'app.goHome': 'ہوم پر جائیں',
+  'app.reload': 'دوبارہ لوڈ کریں',
+  'home.title': 'ہوم',
+  'home.welcome': 'خوش آمدید، {{name}}',
+  'home.subtitle': 'آج کے کام کا نقطہ آغاز۔',
+};

@@ -17,3 +17,6 @@ export * from './components/inputs.js';
 export * from './components/display.js';
 export * from './components/overlays.js';
 export * from './components/state-panel.js';
+
+// API problem+json errors (used by the app's HTTP client and the form kit)
+export * from './form/problem.js';
