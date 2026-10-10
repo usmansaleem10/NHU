@@ -4,9 +4,10 @@
   "private": true,
   "description": "HIMS API (NestJS on Fastify from F0-API-01)",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist .turbo"
+    "clean": "rm -rf dist .turbo",
+    "lint": "eslint . --max-warnings=0"
   },
   "dependencies": {
     "@hims/contracts": "workspace:*"

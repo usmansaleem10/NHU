@@ -132,7 +132,9 @@ docs/adr/      architecture decision records
 
 ## Coding conventions
 
-- `any`, `@ts-ignore` and non-null `!` are lint errors.
+- `any`, `@ts-ignore` and non-null `!` are lint errors, and they **cannot be eslint-disabled**. `@ts-expect-error` is allowed only with a description. Any other `eslint-disable` needs a `-- reason`.
+- **Formatting belongs to Prettier** (`.prettierrc.json`: 100 cols, 2 spaces, semicolons, single quotes, trailing commas, LF). ESLint never formats (`eslint-config-prettier`). Run `pnpm format`; CI runs `pnpm format:check`.
+- Each package has `tsconfig.json` (all of `src`, specs included, for typecheck and lint) and `tsconfig.build.json` (excludes specs, used by `build`).
 - Validate at the edges with the Zod contract; trust types inside.
 - Return typed `DomainError`s; never throw strings.
 - Naming: DB `snake_case`, TS `camelCase`, types `PascalCase`, files `kebab-case`. API routes `/api/v1/<resource>` in plural kebab-case.
