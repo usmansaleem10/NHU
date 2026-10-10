@@ -1,0 +1,10 @@
+# Generated / vendored
+dist
+coverage
+.turbo
+pnpm-lock.yaml
+
+# Read-only spec, hand-edited tracker, and prose docs (tables would churn)
+docs
+hims-tickets.csv
+*.md

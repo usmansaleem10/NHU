@@ -5,9 +5,10 @@
   "description": "HIMS web app (React + Vite from F0-UI-01)",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist .turbo"
+    "clean": "rm -rf dist .turbo",
+    "lint": "eslint . --max-warnings=0"
   },
   "dependencies": {
     "@hims/contracts": "workspace:*",
