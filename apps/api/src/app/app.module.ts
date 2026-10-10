@@ -1,11 +1,13 @@
 import type { DynamicModule, ModuleMetadata } from '@nestjs/common';
 import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import type { DestinationStream } from 'pino';
 import type { Options as PinoHttpOptions } from 'pino-http';
 
 import type { Env } from './config/env';
 import { ENV } from './config/env.token';
+import { ProblemDetailsFilter } from './errors/problem.filter';
 import { createLoggerOptions } from './logging/logger';
 
 export interface AppModuleOptions {
@@ -31,7 +33,10 @@ export class AppModule {
         }),
         ...(options.imports ?? []),
       ],
-      providers: [{ provide: ENV, useValue: env }],
+      providers: [
+        { provide: ENV, useValue: env },
+        { provide: APP_FILTER, useClass: ProblemDetailsFilter },
+      ],
       exports: [ENV],
     };
   }
