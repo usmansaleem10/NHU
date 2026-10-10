@@ -48,7 +48,6 @@ describe('problem+json responses', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/v1/probe/missing-patient',
-      headers: { 'x-request-id': 'req-404' },
     });
 
     expect(response.statusCode).toBe(404);
@@ -59,7 +58,7 @@ describe('problem+json responses', () => {
       status: 404,
       code: 'patient.not_found',
       detail: 'Patient not found',
-      requestId: 'req-404',
+      requestId: response.headers['x-request-id'],
     });
   });
 
@@ -94,14 +93,13 @@ describe('problem+json responses', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/v1/probe/crash',
-      headers: { 'x-request-id': 'req-500' },
     });
 
     expect(response.statusCode).toBe(500);
     expect(response.body).not.toContain('ECONNREFUSED');
     const errorLog = logs
       .map((line) => JSON.parse(line) as { level: number; req?: { id?: string }; err?: unknown })
-      .find((record) => record.level >= 50 && record.req?.id === 'req-500');
+      .find((record) => record.level >= 50 && record.req?.id === response.headers['x-request-id']);
     expect(JSON.stringify(errorLog?.err)).toContain('ECONNREFUSED');
   });
 });

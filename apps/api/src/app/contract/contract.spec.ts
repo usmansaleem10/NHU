@@ -85,7 +85,6 @@ describe('contract-implemented routes', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/v1/probe/items?limit=500',
-      headers: { 'x-request-id': 'req-400' },
     });
 
     expect(response.statusCode).toBe(400);
@@ -93,7 +92,7 @@ describe('contract-implemented routes', () => {
     expect(response.json()).toMatchObject({
       type: 'urn:hims:problem:validation',
       code: 'request.invalid',
-      requestId: 'req-400',
+      requestId: response.headers['x-request-id'],
       errors: [{ path: 'limit' }],
     });
   });
@@ -110,14 +109,13 @@ describe('contract-implemented routes', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/v1/probe/crash',
-      headers: { 'x-request-id': 'req-crash' },
     });
 
     expect(response.statusCode).toBe(500);
     expect(response.body).not.toContain('ECONNREFUSED');
     const errorLog = logs
       .map((line) => JSON.parse(line) as { level: number; req?: { id?: string }; err?: unknown })
-      .find((record) => record.level >= 50 && record.req?.id === 'req-crash');
+      .find((record) => record.level >= 50 && record.req?.id === response.headers['x-request-id']);
     expect(JSON.stringify(errorLog?.err)).toContain('ECONNREFUSED');
   });
 

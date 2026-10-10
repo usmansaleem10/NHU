@@ -30,6 +30,11 @@ describe('logger PII redaction', () => {
     ['token', { token: 'tok_live_abc' }],
     ['accessToken', { accessToken: 'eyJ.access' }],
     ['refreshToken', { refreshToken: 'eyJ.refresh' }],
+    ['name', { name: 'Ali Raza Khan' }],
+    ['email', { email: 'ali@example.pk' }],
+    ['address', { address: 'House 12, Street 4, Lahore' }],
+    ['dob', { dob: '1990-02-14' }],
+    ['dateOfBirth', { dateOfBirth: '1990-02-14' }],
   ])('redacts a top-level %s field', (_field, payload) => {
     const { logger, raw } = capture();
 
@@ -61,7 +66,14 @@ describe('logger PII redaction', () => {
 
     logger.info(
       {
-        req: { headers: { authorization: 'Bearer abc.def', cookie: 'sid=s3cr3t' } },
+        req: {
+          headers: {
+            authorization: 'Bearer abc.def',
+            cookie: 'sid=s3cr3t',
+            'x-api-key': 'key-s3cr3t',
+            'proxy-authorization': 'Basic s3cr3t',
+          },
+        },
         res: { headers: { 'set-cookie': 'sid=s3cr3t; HttpOnly' } },
       },
       'request completed',
@@ -88,5 +100,64 @@ describe('logger PII redaction', () => {
     logger.info('processed 125 rows in 3402 ms');
 
     expect(records()[0]).toMatchObject({ msg: 'processed 125 rows in 3402 ms' });
+  });
+});
+
+describe('logger error serialization', () => {
+  it('masks PII in a Postgres unique-violation error (message, detail, stack)', () => {
+    const { logger, raw } = capture();
+    const pgError = Object.assign(
+      new Error(`duplicate key value violates unique constraint for ${CNIC}`),
+      {
+        code: '23505',
+        detail: 'Key (cnic)=(35202-1234567-1) already exists.',
+        table: 'patients',
+      },
+    );
+
+    logger.error({ err: pgError }, 'insert failed');
+
+    expect(raw()).not.toContain(CNIC);
+    expect(raw()).toContain('23505');
+    expect(raw()).toContain('Key (cnic)=(');
+  });
+
+  it('masks key values that do not match a known PII pattern', () => {
+    const { logger, raw } = capture();
+    const pgError = Object.assign(new Error('duplicate key'), {
+      detail: 'Key (email)=(ali@example.pk) already exists.',
+    });
+
+    logger.error({ err: pgError }, 'insert failed');
+
+    expect(raw()).not.toContain('ali@example.pk');
+  });
+
+  it('drops bound query parameters from Drizzle-style errors', () => {
+    const { logger, raw, records } = capture();
+    const drizzleError = Object.assign(new Error('Failed query: insert into patients'), {
+      query: 'insert into "patients" ("cnic", "name") values ($1, $2)',
+      params: [CNIC, 'Ali Raza Khan'],
+      cause: Object.assign(new Error('pool error'), { parameters: [PHONE] }),
+    });
+
+    logger.error({ err: drizzleError }, 'query failed');
+
+    expect(raw()).not.toContain(CNIC);
+    expect(raw()).not.toContain('Ali Raza Khan');
+    expect(raw()).not.toContain(PHONE);
+    expect(records()[0]).toMatchObject({
+      err: { query: expect.stringContaining('patients') as string },
+    });
+  });
+
+  it('logs the request path but never its query string', () => {
+    const { logger, raw } = capture();
+
+    logger.info({ req: { method: 'GET', url: `/api/v1/patients?cnic=${CNIC}&phone=03001234567` } });
+
+    expect(raw()).toContain('/api/v1/patients');
+    expect(raw()).not.toContain(CNIC);
+    expect(raw()).not.toContain('03001234567');
   });
 });

@@ -2,19 +2,17 @@ import 'reflect-metadata';
 
 import type { IncomingMessage } from 'node:http';
 
-import { API_VERSION } from '@hims/contracts';
 import { NestFactory } from '@nestjs/core';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { FastifyAdapter } from '@nestjs/platform-fastify';
 import { Logger } from 'nestjs-pino';
 
+import { API_PREFIX } from './api-prefix';
 import type { AppModuleOptions } from './app.module';
 import { AppModule } from './app.module';
 import type { Env } from './config/env';
 import { DOCS_PATH } from './contract/docs.controller';
 import { REQUEST_ID_HEADER, resolveRequestId } from './logging/request-id';
-
-export const API_PREFIX = `api/${API_VERSION}`;
 
 /** Builds the configured (not yet listening) application. */
 export async function createApp(
@@ -23,7 +21,8 @@ export async function createApp(
 ): Promise<NestFastifyApplication> {
   const adapter = new FastifyAdapter({
     // Fastify owns the request id; pino-http and error responses reuse request.id.
-    genReqId: (req: IncomingMessage) => resolveRequestId(req.headers[REQUEST_ID_HEADER]),
+    genReqId: (req: IncomingMessage) =>
+      resolveRequestId(req.headers[REQUEST_ID_HEADER], env.TRUST_PROXY_REQUEST_ID),
   });
   const fastify = adapter.getInstance();
   fastify.addHook('onRequest', (request, reply, done) => {

@@ -4,18 +4,32 @@ import { EnvValidationError, loadEnv } from './env';
 
 describe('loadEnv', () => {
   it('applies defaults for a minimal environment', () => {
-    const env = loadEnv({});
+    const env = loadEnv({ NODE_ENV: 'development' });
 
     expect(env).toMatchObject({
       NODE_ENV: 'development',
       HOST: '0.0.0.0',
       PORT: 3000,
       LOG_LEVEL: 'info',
+      TRUST_PROXY_REQUEST_ID: false,
     });
   });
 
+  it('requires NODE_ENV explicitly (no silent development default)', () => {
+    expect(() => loadEnv({})).toThrow(/NODE_ENV/);
+  });
+
   it('coerces PORT from its string form', () => {
-    expect(loadEnv({ PORT: '4100' }).PORT).toBe(4100);
+    expect(loadEnv({ NODE_ENV: 'test', PORT: '4100' }).PORT).toBe(4100);
+  });
+
+  it.each([
+    ['true', true],
+    ['false', false],
+  ])('parses TRUST_PROXY_REQUEST_ID=%s', (value, expected) => {
+    expect(
+      loadEnv({ NODE_ENV: 'test', TRUST_PROXY_REQUEST_ID: value }).TRUST_PROXY_REQUEST_ID,
+    ).toBe(expected);
   });
 
   it.each([
@@ -24,8 +38,9 @@ describe('loadEnv', () => {
     ['PORT', '0'],
     ['NODE_ENV', 'staging'],
     ['LOG_LEVEL', 'verbose'],
+    ['TRUST_PROXY_REQUEST_ID', 'yes'],
   ])('fails fast when %s=%s', (key, value) => {
-    expect(() => loadEnv({ [key]: value })).toThrow(EnvValidationError);
+    expect(() => loadEnv({ NODE_ENV: 'test', [key]: value })).toThrow(EnvValidationError);
   });
 
   it('reports every invalid variable at once, by name, without echoing values', () => {
@@ -33,7 +48,7 @@ describe('loadEnv', () => {
 
     let error: unknown;
     try {
-      loadEnv({ PORT: secretLookingValue, LOG_LEVEL: 'loud' });
+      loadEnv({ NODE_ENV: 'test', PORT: secretLookingValue, LOG_LEVEL: 'loud' });
     } catch (caught) {
       error = caught;
     }

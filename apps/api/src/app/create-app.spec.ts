@@ -44,11 +44,53 @@ describe('createApp request ids', () => {
     );
   });
 
-  it('propagates a caller-supplied x-request-id', async () => {
+  it('mints its own id by default and logs the caller-supplied one as upstreamRequestId', async () => {
     const response = await inject({ 'x-request-id': 'gateway-42' });
 
-    expect(response.headers['x-request-id']).toBe('gateway-42');
-    expect(logsFor('gateway-42')).not.toHaveLength(0);
+    const requestId = String(response.headers['x-request-id']);
+    expect(requestId).not.toBe('gateway-42');
+    expect(logsFor(requestId)).toContainEqual(
+      expect.objectContaining({ upstreamRequestId: 'gateway-42' }),
+    );
+  });
+
+  it('propagates x-request-id only when TRUST_PROXY_REQUEST_ID=true', async () => {
+    const trusted = await createApp(
+      loadEnv({ NODE_ENV: 'test', LOG_LEVEL: 'silent', TRUST_PROXY_REQUEST_ID: 'true' }),
+    );
+    await trusted.init();
+    try {
+      const response = await trusted.inject({
+        method: 'GET',
+        url: '/api/v1/unknown-route',
+        headers: { 'x-request-id': 'gateway-42' },
+      });
+      expect(response.headers['x-request-id']).toBe('gateway-42');
+    } finally {
+      await trusted.close();
+    }
+  });
+
+  it('keeps query-string PII out of request logs', async () => {
+    const response = await app.getHttpAdapter().getInstance().inject({
+      method: 'GET',
+      url: '/api/v1/unknown-route?cnic=35202-1234567-1&phone=03001234567',
+    });
+
+    const logged = JSON.stringify(logsFor(String(response.headers['x-request-id'])));
+    expect(logged).toContain('/api/v1/unknown-route');
+    expect(logged).not.toContain('35202-1234567-1');
+    expect(logged).not.toContain('03001234567');
+  });
+
+  it('does not auto-log orchestrator health probes', async () => {
+    const response = await app.getHttpAdapter().getInstance().inject({
+      method: 'GET',
+      url: '/api/v1/health',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(logsFor(String(response.headers['x-request-id']))).toHaveLength(0);
   });
 
   it('never logs credential headers', async () => {

@@ -13,7 +13,9 @@ import { ContractModule } from './contract/contract.module';
 import { ProblemDetailsFilter } from './errors/problem.filter';
 import { HealthModule } from './health/health.module';
 import { CursorCodec } from './list/cursor';
+import { API_PREFIX } from './api-prefix';
 import { createLoggerOptions } from './logging/logger';
+import { REQUEST_ID_HEADER, upstreamRequestId } from './logging/request-id';
 import { MetaController } from './meta/meta.controller';
 
 export interface AppModuleOptions {
@@ -29,7 +31,23 @@ export class AppModule {
   static forRoot(env: Env, options: AppModuleOptions = {}): DynamicModule {
     // pino-http reuses the request id Fastify assigned (see createApp), so every log line
     // written while handling a request carries the same id the client sees.
-    const pinoHttp: PinoHttpOptions = createLoggerOptions(env.LOG_LEVEL);
+    const pinoHttp: PinoHttpOptions = {
+      ...createLoggerOptions(env.LOG_LEVEL),
+      // Orchestrator probes hit these every few seconds; logging them drowns real traffic.
+      // (middie rewrites req.url relative to the middleware mount; originalUrl is the real path.)
+      autoLogging: {
+        ignore: (req) =>
+          ((req as { originalUrl?: string }).originalUrl ?? req.url ?? '').startsWith(
+            `/${API_PREFIX}/health`,
+          ),
+      },
+      customProps: (req) => {
+        const upstream = env.TRUST_PROXY_REQUEST_ID
+          ? undefined
+          : upstreamRequestId(req.headers[REQUEST_ID_HEADER]);
+        return upstream === undefined ? {} : { upstreamRequestId: upstream };
+      },
+    };
     return {
       module: AppModule,
       global: true,

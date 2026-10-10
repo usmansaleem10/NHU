@@ -5,7 +5,7 @@
   "description": "HIMS API (NestJS on Fastify from F0-API-01)",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "dev": "node --env-file-if-exists=.env --watch -r @swc-node/register src/main.ts",
+    "dev": "NODE_ENV=${NODE_ENV:-development} node --env-file-if-exists=.env --watch -r @swc-node/register src/main.ts",
     "start": "node --env-file-if-exists=.env dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --coverage",
