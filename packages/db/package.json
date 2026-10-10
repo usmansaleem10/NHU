@@ -1,0 +1,54 @@
+{
+  "name": "@hims/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Database infrastructure: Drizzle client, migrations, base columns, RLS tenancy, partitioning, PII encryption, decimal money",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist .turbo",
+    "lint": "eslint . --max-warnings=0",
+    "test": "vitest run --project unit --passWithNoTests",
+    "test:int": "vitest run --project integration",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/cli/migrate.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.4",
+    "pg": "^8.23.1",
+    "uuid": "^14.0.3"
+  },
+  "devDependencies": {
+    "@hims/config": "workspace:*",
+    "@testcontainers/postgresql": "^12.2.0",
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
+  },
+  "peerDependencies": {
+    "@testcontainers/postgresql": "^12.2.0",
+    "drizzle-kit": "^0.31.11"
+  },
+  "peerDependenciesMeta": {
+    "@testcontainers/postgresql": {
+      "optional": true
+    },
+    "drizzle-kit": {
+      "optional": true
+    }
+  }
+}
