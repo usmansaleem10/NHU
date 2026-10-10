@@ -3,6 +3,8 @@ import { STATUS_CODES } from 'node:http';
 import type { ProblemDetails, ProblemKind } from '@hims/contracts';
 import { PROBLEM_KINDS, problemType } from '@hims/contracts';
 import { HttpException } from '@nestjs/common';
+import { ValidationError as ContractValidationError } from '@orpc/contract';
+import { ORPCError } from '@orpc/server';
 
 import { DomainError, ValidationError } from './domain-error';
 
@@ -41,8 +43,35 @@ function domainProblem(error: DomainError): ProblemDetails {
   };
 }
 
+type IssuePath = ContractValidationError['issues'][number]['path'];
+
+function issuePath(path: IssuePath): string {
+  return (path ?? [])
+    .map((segment) => String(typeof segment === 'object' ? segment.key : segment))
+    .join('.');
+}
+
+/** Errors raised by the oRPC contract layer (input/output validation, handler failures). */
+function contractProblem(
+  error: Pick<Error, 'message' | 'cause'> & { status: number },
+): ProblemDetails | undefined {
+  const { cause } = error;
+  if (cause instanceof DomainError) return domainProblem(cause);
+  if (cause instanceof ContractValidationError && error.status === 400) {
+    return {
+      ...kindProblem('validation', 'request.invalid', error.message),
+      errors: cause.issues.map((issue) => ({
+        path: issuePath(issue.path),
+        message: issue.message,
+      })),
+    };
+  }
+  return undefined;
+}
+
 function clientErrorStatus(error: unknown): number | undefined {
   if (error instanceof HttpException) return error.getStatus();
+  if (error instanceof ORPCError) return error.status;
   // Fastify lifecycle errors (body parsing, content type, payload size) carry statusCode.
   if (error instanceof Error && 'statusCode' in error && typeof error.statusCode === 'number') {
     return error.statusCode;
@@ -56,6 +85,10 @@ function clientErrorStatus(error: unknown): number | undefined {
  */
 export function toProblem(error: unknown): ProblemDetails {
   if (error instanceof DomainError) return domainProblem(error);
+  if (error instanceof ORPCError) {
+    const problem = contractProblem(error);
+    if (problem) return problem;
+  }
 
   const status = clientErrorStatus(error);
   if (status !== undefined && status >= 400 && status < 500 && error instanceof Error) {

@@ -13,8 +13,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist .turbo",
-    "lint": "eslint . --max-warnings=0"
+    "clean": "rm -rf dist coverage .turbo",
+    "lint": "eslint . --max-warnings=0",
+    "test": "vitest run --coverage"
   },
   "devDependencies": {
     "@hims/config": "workspace:*",

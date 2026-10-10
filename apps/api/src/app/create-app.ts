@@ -11,6 +11,7 @@ import { Logger } from 'nestjs-pino';
 import type { AppModuleOptions } from './app.module';
 import { AppModule } from './app.module';
 import type { Env } from './config/env';
+import { DOCS_PATH } from './contract/docs.controller';
 import { REQUEST_ID_HEADER, resolveRequestId } from './logging/request-id';
 
 export const API_PREFIX = `api/${API_VERSION}`;
@@ -35,7 +36,7 @@ export async function createApp(
     { bufferLogs: true },
   );
   app.useLogger(app.get(Logger));
-  app.setGlobalPrefix(API_PREFIX);
+  app.setGlobalPrefix(API_PREFIX, { exclude: [DOCS_PATH, `${DOCS_PATH}/openapi.json`] });
   app.enableShutdownHooks();
   return app;
 }

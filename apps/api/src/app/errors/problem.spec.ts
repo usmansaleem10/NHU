@@ -1,6 +1,8 @@
 import type { ProblemKind } from '@hims/contracts';
 import { PROBLEM_KINDS } from '@hims/contracts';
 import { BadRequestException, HttpException, NotFoundException } from '@nestjs/common';
+import { ValidationError as ContractValidationError } from '@orpc/contract';
+import { ORPCError } from '@orpc/server';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -106,6 +108,63 @@ describe('toProblem: framework and unknown errors', () => {
       title: 'Internal server error',
       status: 500,
       code: 'internal',
+    });
+  });
+});
+
+describe('toProblem: contract (oRPC) errors', () => {
+  it('unwraps a DomainError thrown inside a contract handler', () => {
+    const error = new ORPCError('INTERNAL_SERVER_ERROR', {
+      cause: new NotFoundError('patient.not_found', 'Patient not found'),
+    });
+
+    expect(toProblem(error)).toMatchObject({ status: 404, code: 'patient.not_found' });
+  });
+
+  it('maps contract input validation failures to a 400 with field errors', () => {
+    const error = new ORPCError('BAD_REQUEST', {
+      message: 'Input validation failed',
+      cause: new ContractValidationError({
+        message: 'Input validation failed',
+        issues: [
+          { message: 'Too big: expected number to be <=100', path: ['limit'] },
+          { message: 'Invalid option', path: ['filter', { key: 'status' }] },
+          { message: 'Required' },
+        ],
+        data: {},
+      }),
+    });
+
+    expect(toProblem(error)).toEqual({
+      type: 'urn:hims:problem:validation',
+      title: 'Invalid request',
+      status: 400,
+      code: 'request.invalid',
+      detail: 'Input validation failed',
+      errors: [
+        { path: 'limit', message: 'Too big: expected number to be <=100' },
+        { path: 'filter.status', message: 'Invalid option' },
+        { path: '', message: 'Required' },
+      ],
+    });
+  });
+
+  it('treats an invalid handler output as a server fault, not a client error', () => {
+    const error = new ORPCError('INTERNAL_SERVER_ERROR', {
+      cause: new ContractValidationError({
+        message: 'Output validation failed',
+        issues: [],
+        data: {},
+      }),
+    });
+
+    expect(toProblem(error)).toMatchObject({ status: 500, code: 'internal' });
+  });
+
+  it('keeps the status of other contract client errors', () => {
+    expect(toProblem(new ORPCError('NOT_FOUND', { message: 'Not found' }))).toMatchObject({
+      type: 'about:blank',
+      status: 404,
     });
   });
 });
