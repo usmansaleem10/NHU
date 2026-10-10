@@ -8,3 +8,6 @@ pnpm-lock.yaml
 docs
 hims-tickets.csv
 *.md
+
+# Claude Code local state (agent worktrees)
+.claude
