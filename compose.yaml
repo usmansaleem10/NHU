@@ -1,0 +1,104 @@
+# Local development dependencies (ticket F0-REPO-05). Not for production.
+# Start: pnpm deps:up   Stop: pnpm deps:down   Wipe data: pnpm deps:reset
+# Host ports can be overridden in .env (see .env.example) when they clash with local services.
+# All ports bind to 127.0.0.1 only: dev credentials and unauthenticated Redis stay off the LAN.
+name: hims
+
+services:
+  postgres:
+    # Debian image (glibc collation) to match managed Postgres and Testcontainers; not alpine/musl.
+    # A major upgrade needs dump/restore, and Postgres 18+ images mount at /var/lib/postgresql.
+    image: postgres:17.11
+    environment:
+      POSTGRES_USER: hims
+      POSTGRES_PASSWORD: hims # dev-only credential
+      POSTGRES_DB: hims
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # -h 127.0.0.1: the socket-only server during first-run init must not count as ready.
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U hims -d hims']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # The API connects through PgBouncer, like production. Transaction pooling is safe for
+  # our RLS design only because tenant settings are applied per transaction
+  # (set_config(..., true)); server_reset_query does not run in transaction mode.
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.26.0-p0
+    environment:
+      DATABASE_URL: postgres://hims_app:hims_app@postgres:5432/hims
+      POOL_MODE: transaction
+      AUTH_TYPE: scram-sha-256
+      MAX_CLIENT_CONN: 500
+      DEFAULT_POOL_SIZE: 20
+      MAX_PREPARED_STATEMENTS: 200
+      ADMIN_USERS: hims_app # allows SHOW POOLS / STATS on the admin console
+    ports:
+      - '127.0.0.1:${PGBOUNCER_PORT:-6432}:5432'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -p 5432 -U hims_app -d hims']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:8.10.2-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # HTML → PDF for every printable document (P06).
+  gotenberg:
+    image: gotenberg/gotenberg:8.37.0
+    ports:
+      - '127.0.0.1:${GOTENBERG_PORT:-3100}:3000' # 3000 is left free for the API
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:3000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # Catches every outgoing email; web UI shows them.
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    ports:
+      - '127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025'
+      - '127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025'
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # SMS gateway stub: accepts any HTTP request and logs it (`pnpm deps:logs sms-stub`).
+  sms-stub:
+    image: mendhak/http-https-echo:42
+    environment:
+      HTTP_PORT: 8080
+      LOG_IGNORE_PATH: /health
+    ports:
+      - '127.0.0.1:${SMS_STUB_PORT:-8090}:8080'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/health']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-data:
+  redis-data:
