@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import type { DynamicModule, ModuleMetadata } from '@nestjs/common';
 import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
@@ -9,6 +11,7 @@ import type { Env } from './config/env';
 import { ENV } from './config/env.token';
 import { ContractModule } from './contract/contract.module';
 import { ProblemDetailsFilter } from './errors/problem.filter';
+import { CursorCodec } from './list/cursor';
 import { createLoggerOptions } from './logging/logger';
 import { MetaController } from './meta/meta.controller';
 
@@ -40,8 +43,12 @@ export class AppModule {
       providers: [
         { provide: ENV, useValue: env },
         { provide: APP_FILTER, useClass: ProblemDetailsFilter },
+        {
+          provide: CursorCodec,
+          useValue: new CursorCodec(env.CURSOR_SECRET ?? randomBytes(32).toString('hex')),
+        },
       ],
-      exports: [ENV],
+      exports: [ENV, CursorCodec],
     };
   }
 }

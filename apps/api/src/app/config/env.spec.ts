@@ -45,4 +45,18 @@ describe('loadEnv', () => {
     expect(message).toContain('LOG_LEVEL');
     expect(message).not.toContain(secretLookingValue);
   });
+
+  it('requires a cursor-signing secret of 32+ characters in production', () => {
+    expect(() => loadEnv({ NODE_ENV: 'production' })).toThrow(/CURSOR_SECRET/);
+    expect(() => loadEnv({ NODE_ENV: 'production', CURSOR_SECRET: 'short' })).toThrow(
+      /CURSOR_SECRET/,
+    );
+    expect(
+      loadEnv({ NODE_ENV: 'production', CURSOR_SECRET: 'x'.repeat(32) }).CURSOR_SECRET,
+    ).toHaveLength(32);
+  });
+
+  it('lets development run without a cursor secret', () => {
+    expect(loadEnv({ NODE_ENV: 'development' }).CURSOR_SECRET).toBeUndefined();
+  });
 });
