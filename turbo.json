@@ -27,7 +27,24 @@
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": [
+        "NODE_ENV",
+        "PORT",
+        "HOST",
+        "LOG_LEVEL",
+        "DATABASE_*",
+        "POSTGRES_*",
+        "PGBOUNCER_*",
+        "REDIS_*",
+        "GOTENBERG_*",
+        "MAILPIT_*",
+        "SMTP_*",
+        "SMS_*",
+        "SESSION_*",
+        "API_*",
+        "VITE_*"
+      ]
     },
     "test": {
       "dependsOn": ["^build"],
@@ -36,23 +53,28 @@
     },
     "test:int": {
       "dependsOn": ["^build"],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["DATABASE_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "test:e2e": {
       "dependsOn": ["^build"],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["PLAYWRIGHT_*", "BASE_URL", "CI", "DATABASE_*"]
     },
     "db:generate": {
       "dependsOn": ["^build"],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["DATABASE_*"]
     },
     "db:migrate": {
       "dependsOn": ["^build"],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["DATABASE_*"]
     },
     "db:seed": {
       "dependsOn": ["^build", "db:migrate"],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["DATABASE_*"]
     }
   }
 }

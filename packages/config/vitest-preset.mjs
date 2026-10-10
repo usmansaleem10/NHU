@@ -18,13 +18,24 @@ const INT_SPEC = 'src/**/*.int.spec.{ts,tsx}';
 export function vitestConfig(overrides = {}) {
   const base = defineConfig({
     test: {
+      // A workspace may have only unit or only integration specs; the other project must not
+      // fail the run. Set here so both projects inherit it (extends: true).
+      passWithNoTests: true,
       // Coverage runs for the unit project only (`--coverage` in the `test` script), so an
       // integration run never overwrites coverage/ with numbers CI would compare against.
       coverage: {
         provider: 'v8',
         // Listing sources (not just files a test loaded) makes untested files show as 0%.
         include: ['src/**/*.{ts,tsx,mts,mjs}'],
-        exclude: ['src/**/*.spec.{ts,tsx}', 'src/**/*.d.ts'],
+        // Test-only code is not product code.
+        exclude: [
+          'src/**/*.spec.{ts,tsx}',
+          'src/**/*.d.ts',
+          'src/**/__mocks__/**',
+          'src/test/**',
+          'src/**/testing/**',
+          'src/**/*.fixtures.ts',
+        ],
         // text-summary: CI log. json-summary + json: PR comment and the per-file gate.
         // lcov: editors and any external service.
         reporter: ['text-summary', 'json-summary', 'json', 'lcov'],
