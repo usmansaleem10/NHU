@@ -7,6 +7,8 @@ import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
+import { himsPlugin } from './src/eslint/import-boundaries.mjs';
+
 /** @param {{ rootDir: string }} options */
 export function hims({ rootDir }) {
   return defineConfig(
@@ -24,6 +26,7 @@ export function hims({ rootDir }) {
     tseslint.configs.strictTypeChecked,
     comments.recommended,
     {
+      plugins: { hims: himsPlugin },
       languageOptions: {
         globals: { ...globals.node },
         parserOptions: { projectService: true, tsconfigRootDir: rootDir },
@@ -50,7 +53,11 @@ export function hims({ rootDir }) {
           '@typescript-eslint/no-explicit-any',
           '@typescript-eslint/no-non-null-assertion',
           '@typescript-eslint/ban-ts-comment',
+          'hims/import-boundaries',
         ],
+        // AGENTS.md "Repo layout": another feature only via its index.ts, a workspace
+        // package only via its exports (no @hims/<pkg>/src/...). Not disableable.
+        'hims/import-boundaries': 'error',
       },
     },
     // Plain JS config files (eslint/commitlint/lint-staged configs) have no tsconfig.
