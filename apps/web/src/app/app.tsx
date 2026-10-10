@@ -7,6 +7,7 @@ import { AppErrorBoundary } from './errors';
 import { i18n } from './i18n/i18n';
 import { createQueryClient } from './query-client';
 import { createAppRouter } from './router';
+import { ColorSchemeProvider } from './theme';
 
 export function App() {
   const [queryClient] = useState(createQueryClient);
@@ -14,9 +15,11 @@ export function App() {
   return (
     <I18nextProvider i18n={i18n}>
       <AppErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <RouterProvider router={router} />
-        </QueryClientProvider>
+        <ColorSchemeProvider>
+          <QueryClientProvider client={queryClient}>
+            <RouterProvider router={router} />
+          </QueryClientProvider>
+        </ColorSchemeProvider>
       </AppErrorBoundary>
     </I18nextProvider>
   );

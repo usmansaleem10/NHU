@@ -14,6 +14,20 @@ export const en = {
     'Reload the page. If it keeps happening, contact support with the time it occurred.',
   'app.reload': 'Reload',
 
+  'shell.navLabel': 'Main navigation',
+  'shell.openNav': 'Open navigation',
+  'shell.branch': 'Branch',
+  'shell.branchSwitcher': 'Branch: {{branch}}. Change branch',
+  'shell.userMenu': 'Account menu',
+  'shell.theme': 'Theme',
+  'shell.themeLight': 'Light',
+  'shell.themeDark': 'Dark',
+  'shell.themeSystem': 'Match system',
+  'shell.signOut': 'Sign out',
+
+  'nav.group.general': 'General',
+  'nav.home': 'Home',
+
   'home.title': 'Home',
   'home.welcome': 'Welcome, {{name}}',
   'home.subtitle': 'Your starting point for today’s work.',

@@ -3,6 +3,7 @@ import { createRouter } from '@tanstack/react-router';
 
 import { homeRoute } from '../features/home';
 import { RouteError, RoutePending } from './errors';
+import type { AccessRequirement } from './navigation/access';
 import { rootRoute } from './routes/root';
 
 /**
@@ -26,5 +27,9 @@ export function createAppRouter(queryClient: QueryClient) {
 declare module '@tanstack/react-router' {
   interface Register {
     router: ReturnType<typeof createAppRouter>;
+  }
+  interface StaticDataRouteOption {
+    /** Module + permission the screen needs; enforced by the shell's GuardedOutlet. */
+    access?: AccessRequirement;
   }
 }

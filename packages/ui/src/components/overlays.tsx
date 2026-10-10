@@ -139,6 +139,38 @@ export function DropdownMenuSeparator({
   );
 }
 
+/** Side drawer (navigation on tablet/phone). Slides from the inline-start edge, RTL-aware. */
+export function SheetContent({
+  className,
+  children,
+  title,
+  ...props
+}: ComponentProps<typeof DialogPrimitive.Content> & { title: string }) {
+  const { t } = useUiI18n();
+  return (
+    <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-overlay" />
+      <DialogPrimitive.Content
+        aria-describedby={undefined}
+        className={cn(
+          'fixed inset-y-0 start-0 z-50 flex w-72 max-w-[85vw] flex-col border-e bg-sidebar text-sidebar-foreground shadow-lg',
+          className,
+        )}
+        {...props}
+      >
+        <DialogPrimitive.Title className="sr-only">{title}</DialogPrimitive.Title>
+        <DialogPrimitive.Close
+          className="absolute end-2 top-2 inline-flex size-9 cursor-pointer items-center justify-center rounded-md text-sidebar-muted-foreground hover:bg-sidebar-accent"
+          aria-label={t('common.close')}
+        >
+          <X className="size-4" aria-hidden />
+        </DialogPrimitive.Close>
+        {children}
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
+  );
+}
+
 function CheckMark(): ReactNode {
   return (
     <svg viewBox="0 0 16 16" className="size-4" aria-hidden>

@@ -3,6 +3,8 @@ import { createRoute } from '@tanstack/react-router';
 
 import { rootRoute } from '../../app/routes/root';
 
-export const homeRoute = createRoute({ getParentRoute: () => rootRoute, path: '/' }).lazy(() =>
-  import('./routes/home.lazy').then((m) => m.Route),
-);
+export const homeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
+  staticData: { access: { module: 'home', permission: 'home.dashboard.view' } },
+}).lazy(() => import('./routes/home.lazy').then((m) => m.Route));

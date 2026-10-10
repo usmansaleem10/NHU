@@ -1,7 +1,11 @@
+import { StatePanel } from '@hims/ui';
 import type { QueryClient } from '@tanstack/react-query';
-import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
+import { createRootRouteWithContext } from '@tanstack/react-router';
 
 import { NotFound } from '../errors';
+import { services } from '../services';
+import { SessionProvider } from '../session/session-provider';
+import { AppShell } from '../shell/app-shell';
 
 export interface RouterContext {
   queryClient: QueryClient;
@@ -18,8 +22,20 @@ export const rootRoute = createRootRouteWithContext<RouterContext>()({
 
 function RootLayout() {
   return (
-    <main id="main" className="min-h-dvh p-4 md:p-6">
-      <Outlet />
-    </main>
+    <SessionProvider source={services.session}>
+      {(state) =>
+        state.status === 'ready' ? (
+          <AppShell />
+        ) : (
+          <main className="flex min-h-dvh items-center justify-center p-6">
+            {state.status === 'error' ? (
+              <StatePanel kind="error" onRetry={state.retry} />
+            ) : (
+              <StatePanel kind="loading" className="w-full max-w-md" />
+            )}
+          </main>
+        )
+      }
+    </SessionProvider>
   );
 }
