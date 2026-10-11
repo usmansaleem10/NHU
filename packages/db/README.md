@@ -159,8 +159,10 @@ await maintainPartitions(db, ['audit_log', 'domain_events', 'stock_ledger', 'vit
 
 - Calls `app_ensure_monthly_partitions(table, 3)`: creates the current month + 3 ahead, skips
   existing ones (idempotent, safe to run concurrently). It is `SECURITY DEFINER`, so the job runs as
-  `hims_app` and needs no owner credentials; it only accepts tables range-partitioned on one
-  `timestamptz`/`date` column.
+  `hims_app` and needs no owner credentials. It runs with `hims_owner` rights only (not a
+  superuser), `search_path = pg_catalog, pg_temp`, and only accepts a permanent table in `public`,
+  owned by `hims_owner`, with a name of at most 55 characters, range-partitioned on one plain
+  `timestamptz`/`date` column (expression keys and temp tables are refused with SQLSTATE 22023).
 - Then re-checks coverage (`missingMonthlyPartitions`). Any failure throws
   `PartitionMaintenanceError` listing every failed table, after trying all of them. Wire the job's
   failed event to alerting (jobs track); with 3 months of headroom there is time to react.

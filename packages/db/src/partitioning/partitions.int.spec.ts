@@ -55,6 +55,15 @@ beforeAll(async () => {
     ...tenantRlsSql('vitals'),
     `create table audit_log (id uuid, at timestamptz not null) partition by range (at)`,
     'create table not_partitioned (id uuid primary key, at timestamptz)',
+    // Shapes the SECURITY DEFINER function must refuse:
+    'create table expr_key (at timestamp not null) partition by range ((at::date))',
+    'create schema other',
+    'grant usage on schema other to hims_app', // so the function's own check is what refuses
+    'create table other.foreign_schema (at timestamptz not null) partition by range (at)',
+    `create table ${'x'.repeat(56)} (at timestamptz not null) partition by range (at)`,
+  ]);
+  await execAsOwner(pgc.superUrl, [
+    'create table not_owned (at timestamptz not null) partition by range (at)',
   ]);
   app = createDatabase({ connectionString: pgc.appUrl });
   owner = createDatabase({ connectionString: pgc.superUrl }); // raw inspection: bypasses RLS
@@ -122,6 +131,52 @@ describe('ensureMonthlyPartitions', () => {
   it('refuses tables that are not range-partitioned by time', async () => {
     const error = await pgErrorOf(ensureMonthlyPartitions(app.db, 'not_partitioned'));
     expect(error.code).toBe('22023');
+  });
+});
+
+describe('app_ensure_monthly_partitions hardening (SECURITY DEFINER)', () => {
+  const refusal = (parent: string) =>
+    pgErrorOf(app.db.execute(sql`select app_ensure_monthly_partitions(${parent}::regclass)`));
+
+  it.each([
+    ['an expression partition key', 'expr_key'],
+    ['a schema outside the allowlist', 'other.foreign_schema'],
+    ['a table not owned by the function owner', 'not_owned'],
+    ['a name too long for the partition suffix', 'x'.repeat(56)],
+  ])('refuses %s with 22023 and creates nothing', async (_case, parent) => {
+    expect((await refusal(parent)).code).toBe('22023');
+    const created = await owner.db.execute(
+      sql`select 1 from pg_inherits where inhparent = ${parent}::regclass`,
+    );
+    expect(created.rowCount).toBe(0);
+  });
+
+  it("refuses the caller's own temporary partitioned table", async () => {
+    const client = await app.pool.connect();
+    try {
+      await client.query(
+        'create temp table scratch (at timestamptz not null) partition by range (at)',
+      );
+      const error = await client
+        .query("select app_ensure_monthly_partitions('pg_temp.scratch'::regclass)")
+        .then(
+          () => undefined,
+          (e: unknown) => e as { code?: string },
+        );
+      expect(error?.code).toBe('22023');
+    } finally {
+      client.release(true);
+    }
+  });
+
+  it('pins search_path to pg_catalog then pg_temp, and the app role is still no superuser', async () => {
+    const config = await owner.db.execute<{ config: string[] }>(sql`
+      select proconfig as config from pg_proc where proname = 'app_ensure_monthly_partitions'`);
+    expect(config.rows[0]?.config).toContain('search_path=pg_catalog, pg_temp');
+    const role = await owner.db.execute<{ rolsuper: boolean }>(
+      sql`select rolsuper from pg_roles where rolname = 'hims_app'`,
+    );
+    expect(role.rows[0]?.rolsuper).toBe(false);
   });
 });
 

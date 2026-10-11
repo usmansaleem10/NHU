@@ -11,9 +11,11 @@ export interface TenantRlsOptions {
   branchScoped?: boolean;
 }
 
-const quoteIdent = (name: string): string => `"${name.replaceAll('"', '""')}"`;
+/** Postgres identifier quoting (doubles embedded quotes). */
+export const quoteIdent = (name: string): string => `"${name.replaceAll('"', '""')}"`;
 
-function qualifiedName(table: PgTable | string): string {
+/** "schema"."table" for a Drizzle table, or a quoted bare name for a string. */
+export function qualifiedName(table: PgTable | string): string {
   if (typeof table === 'string') return quoteIdent(table);
   const { name, schema } = getTableConfig(table);
   return schema ? `${quoteIdent(schema)}.${quoteIdent(name)}` : quoteIdent(name);

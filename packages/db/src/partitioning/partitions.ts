@@ -1,8 +1,9 @@
 import { sql } from 'drizzle-orm';
-import { getTableConfig, type PgTable } from 'drizzle-orm/pg-core';
+import type { PgTable } from 'drizzle-orm/pg-core';
 
 import type { DbExecutor } from '../client.js';
 import { DbError } from '../errors.js';
+import { qualifiedName } from '../tenancy/rls.js';
 
 export const DEFAULT_MONTHS_AHEAD = 3;
 
@@ -13,11 +14,9 @@ export interface PartitionOptions {
   from?: Date;
 }
 
-function qualifiedName(parent: PgTable | string): string {
-  if (typeof parent === 'string') return parent;
-  const { name, schema } = getTableConfig(parent);
-  return schema ? `"${schema}"."${name}"` : `"${name}"`;
-}
+/** regclass text: a Drizzle table is quoted safely; a string is taken as Postgres would parse it. */
+const regclassText = (parent: PgTable | string): string =>
+  typeof parent === 'string' ? parent : qualifiedName(parent);
 
 const utcDate = (date: Date): string => date.toISOString().slice(0, 10);
 
@@ -33,7 +32,7 @@ export async function ensureMonthlyPartitions(
 ): Promise<number> {
   const result = await db.execute<{ created: number }>(sql`
     select app_ensure_monthly_partitions(
-      ${qualifiedName(parent)}::regclass,
+      ${regclassText(parent)}::regclass,
       ${options.monthsAhead ?? DEFAULT_MONTHS_AHEAD}::integer,
       ${utcDate(options.from ?? new Date())}::date
     ) as created`);
@@ -47,7 +46,7 @@ export async function missingMonthlyPartitions(
   options: PartitionOptions = {},
 ): Promise<string[]> {
   const result = await db.execute<{ month: string }>(sql`
-    with parent as (select ${qualifiedName(parent)}::regclass as oid),
+    with parent as (select ${regclassText(parent)}::regclass as oid),
     months as (
       select to_char(m, 'YYYY-MM') as month, to_char(m, '"_p"YYYYMM') as suffix
         from generate_series(
@@ -100,7 +99,7 @@ export async function maintainPartitions(
       const missing = await missingMonthlyPartitions(db, parent, options);
       if (missing.length > 0) throw new Error(`missing partitions: ${missing.join(', ')}`);
     } catch (error) {
-      failures.push({ table: qualifiedName(parent), error });
+      failures.push({ table: regclassText(parent), error });
     }
   }
   if (failures.length > 0) throw new PartitionMaintenanceError(failures);
