@@ -27,6 +27,9 @@ export interface AppModuleOptions {
   imports?: ModuleMetadata['imports'];
 }
 
+/** Orchestrator probes: exact paths only, so e.g. /api/v1/health-records is still logged. */
+const PROBE_PATHS = new Set([`/${API_PREFIX}/health`, `/${API_PREFIX}/health/ready`]);
+
 @Module({})
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class -- Nest modules are decorator-only classes
 export class AppModule {
@@ -39,8 +42,8 @@ export class AppModule {
       // (middie rewrites req.url relative to the middleware mount; originalUrl is the real path.)
       autoLogging: {
         ignore: (req) =>
-          ((req as { originalUrl?: string }).originalUrl ?? req.url ?? '').startsWith(
-            `/${API_PREFIX}/health`,
+          PROBE_PATHS.has(
+            ((req as { originalUrl?: string }).originalUrl ?? req.url ?? '').split('?')[0] ?? '',
           ),
       },
       customProps: (req) => {

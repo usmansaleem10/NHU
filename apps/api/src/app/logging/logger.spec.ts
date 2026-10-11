@@ -1,7 +1,7 @@
 import { pino } from 'pino';
 import { describe, expect, it } from 'vitest';
 
-import { createLoggerOptions, REDACTED } from './logger';
+import { createLoggerOptions, maskPii, REDACTED } from './logger';
 
 function capture() {
   const lines: string[] = [];
@@ -159,5 +159,87 @@ describe('logger error serialization', () => {
     expect(raw()).toContain('/api/v1/patients');
     expect(raw()).not.toContain(CNIC);
     expect(raw()).not.toContain('03001234567');
+  });
+});
+
+describe('maskPii robustness', () => {
+  it.each([
+    ['unterminated pg key fragments', 'Key ('.repeat(40_000)],
+    ['pg key prefixes without values', 'Key (a)=('.repeat(20_000)],
+    ['failing-row prefixes', 'Failing row contains ('.repeat(10_000)],
+    ['drizzle params markers', '\nparams: '.repeat(20_000)],
+    ['long digit runs', '9'.repeat(200_000)],
+    ['digit runs with dashes', '3002-'.repeat(40_000)],
+  ])('masks 200 KB of adversarial input (%s) in well under 50 ms', (_case, input) => {
+    const started = performance.now();
+    maskPii(input);
+    expect(performance.now() - started).toBeLessThan(50);
+  });
+
+  it('truncates very long strings before masking', () => {
+    const masked = maskPii(`${'a'.repeat(20_000)} ${CNIC}`);
+
+    expect(masked.length).toBeLessThanOrEqual(8 * 1024 + 32);
+    expect(masked).not.toContain(CNIC);
+  });
+
+  it.each([
+    ['an epoch in microseconds', 'job finished at 1791653303088123'],
+    ['an epoch in ms with a mobile-like tail', 'scheduled at 1791653001234567'],
+    ['an id ending in a mobile-like tail', 'order ORD-99923001234567 created'],
+    ['a long numeric id', 'trace 8823001234567123'],
+  ])('leaves %s alone', (_case, text) => {
+    expect(maskPii(text)).toBe(text);
+  });
+
+  it('masks a bare 13-digit number: it cannot be told apart from an undashed CNIC', () => {
+    // Deliberate: a leaked CNIC is worse than a masked ms timestamp in free text. pino's own
+    // `time` field is numeric and never passes through maskPii.
+    expect(maskPii('at 1791653303088')).toBe(`at ${REDACTED}`);
+  });
+
+  it.each([
+    ['dashed CNIC', `cnic ${CNIC}`],
+    ['plain CNIC', 'cnic 3520212345671'],
+    ['local mobile', 'call 03001234567'],
+    ['dashed local mobile', 'call 0300-1234567'],
+    ['international mobile', `call ${PHONE}`],
+    ['0092 mobile', 'call 00923001234567'],
+  ])('still masks %s', (_case, text) => {
+    expect(maskPii(text)).toContain(REDACTED);
+  });
+
+  it('masks the row values Postgres echoes in "Failing row contains (...)"', () => {
+    expect(maskPii('Failing row contains (p-1, Ali Raza Khan, ali@example.pk, null).')).toBe(
+      `Failing row contains (${REDACTED}).`,
+    );
+  });
+
+  it('masks the params tail Drizzle appends to its error message', () => {
+    const message =
+      'Failed query: insert into "patients" values ($1, $2)\nparams: Ali Raza Khan,ali@example.pk';
+
+    const masked = maskPii(message);
+
+    expect(masked).toContain('Failed query: insert into "patients"');
+    expect(masked).not.toContain('Ali Raza Khan');
+    expect(masked).not.toContain('ali@example.pk');
+  });
+});
+
+describe('logger error serialization of row-bearing fields', () => {
+  it('drops the pg `where` context and masks "Failing row" details', () => {
+    const { logger, raw } = capture();
+    const pgError = Object.assign(new Error('new row violates check constraint'), {
+      code: '23514',
+      detail: 'Failing row contains (p-1, Ali Raza Khan, 1990-02-14).',
+      where: 'SQL statement "insert into patients values (\'Ali Raza Khan\')"',
+    });
+
+    logger.error({ err: pgError }, 'insert failed');
+
+    expect(raw()).not.toContain('Ali Raza Khan');
+    expect(raw()).not.toContain('"where"');
+    expect(raw()).toContain('23514');
   });
 });

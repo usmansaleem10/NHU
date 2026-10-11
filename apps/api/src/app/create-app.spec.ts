@@ -83,6 +83,15 @@ describe('createApp request ids', () => {
     expect(logged).not.toContain('03001234567');
   });
 
+  it('still logs routes that merely start with "health"', async () => {
+    const response = await app.getHttpAdapter().getInstance().inject({
+      method: 'GET',
+      url: '/api/v1/health-records?x=1',
+    });
+
+    expect(logsFor(String(response.headers['x-request-id']))).not.toHaveLength(0);
+  });
+
   it('does not auto-log orchestrator health probes', async () => {
     const response = await app.getHttpAdapter().getInstance().inject({
       method: 'GET',
@@ -91,6 +100,11 @@ describe('createApp request ids', () => {
 
     expect(response.statusCode).toBe(200);
     expect(logsFor(String(response.headers['x-request-id']))).toHaveLength(0);
+    const ready = await app.getHttpAdapter().getInstance().inject({
+      method: 'GET',
+      url: '/api/v1/health/ready?probe=k8s',
+    });
+    expect(logsFor(String(ready.headers['x-request-id']))).toHaveLength(0);
   });
 
   it('never logs credential headers', async () => {
