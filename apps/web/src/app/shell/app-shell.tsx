@@ -1,12 +1,21 @@
-import { Button, Dialog, DialogTrigger, SheetContent, StatePanel } from '@hims/ui';
+import {
+  Button,
+  createFormatters,
+  Dialog,
+  DialogTrigger,
+  FormatProvider,
+  SheetContent,
+  StatePanel,
+} from '@hims/ui';
 import { Outlet, useMatches, useRouterState } from '@tanstack/react-router';
 import { Hospital, Menu } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { formatLocaleFor, isLanguage } from '../i18n/i18n';
 import { canAccess } from '../navigation/access';
 import { useSession } from '../session/session-provider';
-import { BranchSwitcher, UserMenu } from './header-menus';
+import { BranchSwitcher, LanguageSwitcher, UserMenu } from './header-menus';
 import { SidebarNav } from './sidebar-nav';
 
 function Brand() {
@@ -34,7 +43,28 @@ function GuardedOutlet() {
   return allowed ? <Outlet /> : <StatePanel kind="forbidden" />;
 }
 
+/** Numbers, money and dates follow the tenant's settings in the user's language. */
+function TenantFormatProvider({ children }: { children: ReactNode }) {
+  const { session } = useSession();
+  const { i18n } = useTranslation();
+  const language = isLanguage(i18n.language) ? i18n.language : 'en';
+  const { format } = session.tenant;
+  const formatters = useMemo(
+    () => createFormatters({ ...format, locale: formatLocaleFor(language, format.locale) }),
+    [format, language],
+  );
+  return <FormatProvider value={formatters}>{children}</FormatProvider>;
+}
+
 export function AppShell() {
+  return (
+    <TenantFormatProvider>
+      <ShellLayout />
+    </TenantFormatProvider>
+  );
+}
+
+function ShellLayout() {
   const { t } = useTranslation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
@@ -87,6 +117,7 @@ export function AppShell() {
             </SheetContent>
           </Dialog>
           <div className="flex-1" />
+          <LanguageSwitcher />
           <BranchSwitcher />
           <UserMenu />
         </header>

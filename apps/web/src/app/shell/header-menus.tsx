@@ -10,9 +10,10 @@ import {
   DropdownMenuTrigger,
   type ColorScheme,
 } from '@hims/ui';
-import { Building2, ChevronDown, LogOut, UserRound } from 'lucide-react';
+import { Building2, ChevronDown, Languages, LogOut, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { isLanguage, LANGUAGES, setLanguage } from '../i18n/i18n';
 import { useSession } from '../session/session-provider';
 import { useColorScheme } from '../theme';
 
@@ -90,6 +91,36 @@ export function UserMenu() {
           <LogOut aria-hidden />
           {t('shell.signOut')}
         </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export function LanguageSwitcher() {
+  const { t, i18n } = useTranslation();
+  const current = isLanguage(i18n.language) ? i18n.language : 'en';
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" aria-label={t('shell.language')}>
+          <Languages aria-hidden />
+          <span className="hidden sm:inline">{t(`language.${current}`)}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>{t('shell.language')}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={current}
+          onValueChange={(v) => {
+            if (isLanguage(v)) setLanguage(v);
+          }}
+        >
+          {LANGUAGES.map((lng) => (
+            <DropdownMenuRadioItem key={lng} value={lng} lang={lng}>
+              {t(`language.${lng}`)}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

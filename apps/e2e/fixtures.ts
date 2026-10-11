@@ -15,7 +15,9 @@ export const test = base.extend<{ persona: Persona; language: 'en' | 'ur' }>({
     await page.addInitScript(
       ([p, l]) => {
         localStorage.setItem('hims.dev.persona', p);
-        localStorage.setItem('hims.language', l);
+        // Only the initial language: a user's switch must survive reloads within the test.
+        if (localStorage.getItem('hims.language') === null)
+          localStorage.setItem('hims.language', l);
       },
       [persona, language] as const,
     );

@@ -28,7 +28,10 @@ export interface Access {
   modules: ReadonlySet<string>;
 }
 
-export function accessFromSession(session: Pick<Session, 'permissions' | 'tenant'>): Access {
+export function accessFromSession(session: {
+  permissions: Session['permissions'];
+  tenant: Pick<Session['tenant'], 'enabledModules'>;
+}): Access {
   return {
     permissions: new Set(session.permissions),
     modules: new Set(session.tenant.enabledModules),

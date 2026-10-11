@@ -24,6 +24,9 @@ export const en = {
   'shell.themeDark': 'Dark',
   'shell.themeSystem': 'Match system',
   'shell.signOut': 'Sign out',
+  'shell.language': 'Language',
+  'language.en': 'English',
+  'language.ur': 'اردو',
 
   'nav.group.general': 'General',
   'nav.home': 'Home',

@@ -4,6 +4,8 @@
  * config F0-TEN) will implement SessionSource with the same shape.
  */
 
+import type { TenantFormatSettings } from '@hims/ui';
+
 /** `module.resource.action`, e.g. "masters.catalog.view" (AGENTS.md rule 3). */
 export type Permission = `${string}.${string}.${string}`;
 
@@ -17,7 +19,13 @@ export interface Branch {
 
 export interface Session {
   user: { id: string; displayName: string; roleLabel: string };
-  tenant: { id: string; name: string; enabledModules: readonly ModuleKey[] };
+  tenant: {
+    id: string;
+    name: string;
+    enabledModules: readonly ModuleKey[];
+    /** Tenant formatting settings (F0-TEN config): region locale, time zone, currency. */
+    format: TenantFormatSettings;
+  };
   branches: readonly Branch[];
   activeBranchId: string;
   permissions: readonly Permission[];

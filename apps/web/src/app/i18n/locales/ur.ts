@@ -19,6 +19,7 @@ export const ur: Partial<AppMessages> = {
   'shell.themeDark': 'تاریک',
   'shell.themeSystem': 'سسٹم کے مطابق',
   'shell.signOut': 'سائن آؤٹ',
+  'shell.language': 'زبان',
   'nav.group.general': 'عمومی',
   'nav.home': 'ہوم',
   'nav.group.foundation': 'فرنٹ اینڈ بنیاد',

@@ -31,7 +31,7 @@ const groups: NavGroup[] = [
 const access = (permissions: string[], modules: string[]) =>
   accessFromSession({
     permissions: permissions as `${string}.${string}.${string}`[],
-    tenant: { id: 't', name: 't', enabledModules: modules },
+    tenant: { enabledModules: modules },
   });
 
 describe('filterNav', () => {

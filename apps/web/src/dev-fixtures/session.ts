@@ -17,6 +17,8 @@ const ALL_PERMISSIONS: Permission[] = [
   'masters.staff-types.update',
 ];
 
+const PK_FORMAT = { locale: 'en-PK', timeZone: 'Asia/Karachi', currency: 'PKR' };
+
 const BRANCHES = [
   { id: 'br-main', name: 'Main Campus' },
   { id: 'br-city', name: 'City Clinic' },
@@ -29,6 +31,7 @@ const PERSONAS: Record<string, Omit<Session, 'activeBranchId'>> = {
       id: 'demo-a',
       name: 'Demo Hospital A',
       enabledModules: ['home', 'foundation', 'masters'],
+      format: PK_FORMAT,
     },
     branches: BRANCHES,
     permissions: ALL_PERMISSIONS,
@@ -40,6 +43,7 @@ const PERSONAS: Record<string, Omit<Session, 'activeBranchId'>> = {
       id: 'demo-a',
       name: 'Demo Hospital A',
       enabledModules: ['home', 'foundation', 'masters'],
+      format: PK_FORMAT,
     },
     branches: BRANCHES.slice(0, 1),
     permissions: [
@@ -52,7 +56,12 @@ const PERSONAS: Record<string, Omit<Session, 'activeBranchId'>> = {
   // Has every permission but the tenant hasn't licensed the masters module.
   unlicensed: {
     user: { id: 'u-admin-b', displayName: 'Demo Admin B', roleLabel: 'Tenant administrator' },
-    tenant: { id: 'demo-b', name: 'Demo Hospital B', enabledModules: ['home', 'foundation'] },
+    tenant: {
+      id: 'demo-b',
+      name: 'Demo Hospital B',
+      enabledModules: ['home', 'foundation'],
+      format: { ...PK_FORMAT, dateStyle: 'long' },
+    },
     branches: BRANCHES,
     permissions: ALL_PERMISSIONS,
   },

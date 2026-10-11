@@ -25,7 +25,7 @@ const RAW_COLOUR_PATTERNS = [
 function findRawColour(text) {
   for (const { re, what } of RAW_COLOUR_PATTERNS) {
     const m = re.exec(text);
-    if (m) return { what, match: m[0].trim() };
+    if (m) return { what, match: m[0].replace(/^[^#a-z0-9]+/i, '') };
   }
   return null;
 }
