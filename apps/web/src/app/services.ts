@@ -16,6 +16,8 @@ import {
   type DemoRegistration,
 } from '../dev-fixtures/demo-form';
 import { createDemoPatientSource, type DemoPatient } from '../dev-fixtures/demo-patients';
+import { createDevMasterSources } from '../dev-fixtures/masters';
+import type { MasterDataSource } from '../features/masters';
 import { createDevSessionSource } from '../dev-fixtures/session';
 import type { SessionSource } from './session/types';
 
@@ -29,6 +31,8 @@ export interface AppServices {
   searchDepartments: TypeaheadSearch;
   /** Form-kit reference submit; throws ProblemError (problem+json) on validation failure. */
   submitDemoRegistration: (input: DemoRegistration) => Promise<{ id: string }>;
+  /** Simple-master CRUD per resource id (GET/POST/PUT /api/v1/<id>). */
+  masters: (masterId: string) => MasterDataSource;
 }
 
 function browserStorage(): Storage {
@@ -62,4 +66,5 @@ export const services: AppServices = {
   savedViews: createStorageSavedViewsStore(browserStorage()),
   searchDepartments,
   submitDemoRegistration,
+  masters: createDevMasterSources(),
 };

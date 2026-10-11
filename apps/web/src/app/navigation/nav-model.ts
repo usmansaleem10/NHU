@@ -1,4 +1,4 @@
-import { FileInput, LayoutDashboard, Table2 } from 'lucide-react';
+import { Database, FileInput, LayoutDashboard, Table2 } from 'lucide-react';
 
 import type { NavGroup } from './access';
 
@@ -41,6 +41,20 @@ export const NAV_MODEL: readonly NavGroup[] = [
         icon: FileInput,
         module: 'foundation',
         permission: 'foundation.form.view',
+      },
+    ],
+  },
+  {
+    id: 'administration',
+    labelKey: 'nav.group.administration',
+    items: [
+      {
+        id: 'masters',
+        labelKey: 'nav.masters',
+        to: '/masters',
+        icon: Database,
+        module: 'masters',
+        permission: 'masters.catalog.view',
       },
     ],
   },

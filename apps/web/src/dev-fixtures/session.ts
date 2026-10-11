@@ -12,8 +12,9 @@ const ALL_PERMISSIONS: Permission[] = [
   'foundation.form.view',
   'foundation.patientSearch.view',
   'masters.catalog.view',
-  'masters.record.create',
-  'masters.record.update',
+  'masters.staff-types.view',
+  'masters.staff-types.create',
+  'masters.staff-types.update',
 ];
 
 const BRANCHES = [
@@ -41,7 +42,12 @@ const PERSONAS: Record<string, Omit<Session, 'activeBranchId'>> = {
       enabledModules: ['home', 'foundation', 'masters'],
     },
     branches: BRANCHES.slice(0, 1),
-    permissions: ['home.dashboard.view', 'foundation.patientSearch.view', 'masters.catalog.view'],
+    permissions: [
+      'home.dashboard.view',
+      'foundation.patientSearch.view',
+      'masters.catalog.view',
+      'masters.staff-types.view',
+    ],
   },
   // Has every permission but the tenant hasn't licensed the masters module.
   unlicensed: {

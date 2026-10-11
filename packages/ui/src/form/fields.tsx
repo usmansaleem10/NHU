@@ -107,7 +107,10 @@ export function TextField<T extends FieldValues>({
   autoComplete,
   maxLength,
   inputMode,
+  readOnly,
 }: BaseFieldProps<T> & {
+  /** Shown and submitted but not editable (unlike `disabled`, which drops the value). */
+  readOnly?: boolean;
   type?: 'text' | 'email' | 'tel' | 'number' | 'password';
   autoComplete?: string;
   maxLength?: number;
@@ -130,6 +133,8 @@ export function TextField<T extends FieldValues>({
           {...aria}
           type={type}
           disabled={disabled}
+          readOnly={readOnly}
+          className={readOnly ? 'bg-muted text-muted-foreground' : undefined}
           {...(autoComplete ? { autoComplete } : {})}
           {...(maxLength ? { maxLength } : {})}
           {...(inputMode ? { inputMode } : {})}

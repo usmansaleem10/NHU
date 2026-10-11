@@ -3,6 +3,7 @@ import { createRouter } from '@tanstack/react-router';
 
 import { foundationRoutes } from '../features/foundation';
 import { homeRoute } from '../features/home';
+import { mastersRoutes } from '../features/masters';
 import { RouteError, RoutePending } from './errors';
 import type { AccessRequirement } from './navigation/access';
 import { rootRoute } from './routes/root';
@@ -12,7 +13,7 @@ import { rootRoute } from './routes/root';
  * AGENTS.md's feature layout requires, with no generated route-tree file. Every screen component
  * is behind `.lazy()`, so it ships in its own chunk (route-level code splitting).
  */
-const routeTree = rootRoute.addChildren([homeRoute, ...foundationRoutes]);
+const routeTree = rootRoute.addChildren([homeRoute, ...foundationRoutes, ...mastersRoutes]);
 
 export function createAppRouter(queryClient: QueryClient) {
   return createRouter({
