@@ -84,6 +84,27 @@ describe('CursorCodec', () => {
     ]);
   });
 
+  it('binds Date filter values by instant (different ranges are rejected)', () => {
+    const january = { createdAt: { gte: new Date('2026-01-01T00:00:00Z') } };
+    const february = { createdAt: { gte: new Date('2026-02-01T00:00:00Z') } };
+    const cursor = codec.encode({ ...binding, filter: january }, ['x']);
+
+    expect(
+      codec.decode(cursor, {
+        ...binding,
+        filter: { createdAt: { gte: new Date('2026-01-01T00:00:00Z') } },
+      }),
+    ).toEqual(['x']);
+    expectRejected(() => codec.decode(cursor, { ...binding, filter: february }));
+  });
+
+  it('binds bigint filter values instead of failing', () => {
+    const cursor = codec.encode({ ...binding, filter: { mrn: 900_000_000_001n } }, ['x']);
+
+    expect(codec.decode(cursor, { ...binding, filter: { mrn: 900_000_000_001n } })).toEqual(['x']);
+    expectRejected(() => codec.decode(cursor, { ...binding, filter: { mrn: 900_000_000_002n } }));
+  });
+
   it('expires cursors after the configured lifetime', () => {
     const issuedAt = now;
     const cursor = codec.encode(binding, ['x', 'p-1']);
