@@ -18,6 +18,8 @@ export const envSchema = z
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .default('info'),
+    /** Serve /api/docs and /api/docs/openapi.json. Off unless explicitly enabled. */
+    API_DOCS_ENABLED: flag,
     /** Reuse an incoming x-request-id only when a trusted proxy sets it. */
     TRUST_PROXY_REQUEST_ID: flag,
     /** HMAC key for list cursors. Required in production; a per-process random key otherwise. */

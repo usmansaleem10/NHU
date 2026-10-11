@@ -3,7 +3,8 @@ import { OpenAPIGenerator } from '@orpc/openapi';
 import { ZodToJsonSchemaConverter } from '@orpc/zod/zod4';
 import { z } from 'zod';
 
-type OpenAPIDocument = Awaited<ReturnType<OpenAPIGenerator['generate']>>;
+export type OpenAPIDocument = Awaited<ReturnType<OpenAPIGenerator['generate']>>;
+export type OpenApiGenerator = (release: string) => Promise<OpenAPIDocument>;
 
 const PROBLEM_REF = '#/components/schemas/ProblemDetails';
 

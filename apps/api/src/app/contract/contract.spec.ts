@@ -59,10 +59,13 @@ const logs: string[] = [];
 let app: NestFastifyApplication;
 
 beforeAll(async () => {
-  app = await createApp(loadEnv({ NODE_ENV: 'test', APP_RELEASE: 'sha-abc123' }), {
-    imports: [ProbeModule],
-    logDestination: { write: (line: string) => logs.push(line) },
-  });
+  app = await createApp(
+    loadEnv({ NODE_ENV: 'test', APP_RELEASE: 'sha-abc123', API_DOCS_ENABLED: 'true' }),
+    {
+      imports: [ProbeModule],
+      logDestination: { write: (line: string) => logs.push(line) },
+    },
+  );
   await app.init();
 });
 

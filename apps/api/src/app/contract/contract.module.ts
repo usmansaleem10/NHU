@@ -4,7 +4,6 @@ import { ORPCModule } from '@orpc/nest';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { toProblem } from '../errors/problem';
-import { DocsController } from './docs.controller';
 
 const logger = new Logger('Contract');
 
@@ -40,7 +39,6 @@ const logger = new Logger('Contract');
       ],
     }),
   ],
-  controllers: [DocsController],
 })
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class -- Nest modules are decorator-only classes
 export class ContractModule {}

@@ -10,6 +10,7 @@ import type { Options as PinoHttpOptions } from 'pino-http';
 import type { Env } from './config/env';
 import { ENV } from './config/env.token';
 import { ContractModule } from './contract/contract.module';
+import { DocsController } from './contract/docs.controller';
 import { ProblemDetailsFilter } from './errors/problem.filter';
 import { HealthModule } from './health/health.module';
 import { CursorCodec } from './list/cursor';
@@ -59,7 +60,7 @@ export class AppModule {
         HealthModule,
         ...(options.imports ?? []),
       ],
-      controllers: [MetaController],
+      controllers: [MetaController, ...(env.API_DOCS_ENABLED ? [DocsController] : [])],
       providers: [
         { provide: ENV, useValue: env },
         { provide: APP_FILTER, useClass: ProblemDetailsFilter },
