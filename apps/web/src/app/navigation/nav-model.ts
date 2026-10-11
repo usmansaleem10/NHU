@@ -1,4 +1,4 @@
-import { LayoutDashboard } from 'lucide-react';
+import { LayoutDashboard, Table2 } from 'lucide-react';
 
 import type { NavGroup } from './access';
 
@@ -19,6 +19,20 @@ export const NAV_MODEL: readonly NavGroup[] = [
         icon: LayoutDashboard,
         module: 'home',
         permission: 'home.dashboard.view',
+      },
+    ],
+  },
+  {
+    id: 'foundation',
+    labelKey: 'nav.group.foundation',
+    items: [
+      {
+        id: 'data-table',
+        labelKey: 'nav.dataTable',
+        to: '/foundation/data-table',
+        icon: Table2,
+        module: 'foundation',
+        permission: 'foundation.table.view',
       },
     ],
   },

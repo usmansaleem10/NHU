@@ -11,6 +11,10 @@ export * from './theme/theme-css.js';
 export * from './i18n/messages.js';
 export * from './i18n/context.js';
 
+// Formatting (F0-UI-06)
+export * from './format/formatters.js';
+export * from './format/format-context.js';
+
 // Primitives
 export * from './components/button.js';
 export * from './components/inputs.js';
@@ -18,5 +22,12 @@ export * from './components/display.js';
 export * from './components/overlays.js';
 export * from './components/state-panel.js';
 
-// API problem+json errors (used by the app's HTTP client and the form kit)
+// Data table (F0-UI-03)
+export * from './data-table/query-state.js';
+export * from './data-table/data-table.js';
+export * from './data-table/export.js';
+export * from './data-table/saved-views.js';
+export * from './data-table/toolbar.js';
+
+// Form kit (F0-UI-04)
 export * from './form/problem.js';
