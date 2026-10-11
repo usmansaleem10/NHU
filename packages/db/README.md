@@ -264,8 +264,9 @@ const [{ total }] = await tx
   .from(invoiceLines);
 ```
 
-- Inputs are strings or `Decimal` only (`DecimalInput`); contracts should carry money as decimal
-  strings.
+- Inputs are plain decimal strings (`^-?\d+(\.\d+)?$`: no exponent, hex, `NaN`/`Infinity`) or
+  `Decimal` only (`DecimalInput`); contracts should carry money as such strings. Reads reject
+  non-finite `numeric` values.
 - Writing a value with more decimal places than the column throws `DecimalValueError` instead of
   letting Postgres round silently; round explicitly with `roundMoney` / `roundQuantity` (half away
   from zero, same as Postgres). Overflow of `numeric(14,s)` is rejected too.

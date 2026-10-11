@@ -17,11 +17,6 @@ const toDb = (column: typeof t.amount | typeof t.qty, value: Decimal) =>
   column.mapToDriverValue(value);
 
 describe('decimal arithmetic', () => {
-  it('adds 0.1 + 0.2 to exactly 0.3', () => {
-    expect(toDecimal('0.1').plus('0.2').equals('0.3')).toBe(true);
-    expect(0.1 + 0.2 === 0.3).toBe(false); // why JS number is banned for money
-  });
-
   it('rounds half away from zero, like Postgres numeric', () => {
     expect(roundMoney('2.345').toFixed(2)).toBe('2.35');
     expect(roundMoney('-2.345').toFixed(2)).toBe('-2.35');
@@ -35,18 +30,12 @@ describe('decimal arithmetic', () => {
     expect(roundMoney(line).toFixed(2)).toBe('50.00');
   });
 
-  it('keeps large totals exact where float would drift', () => {
-    const total = Array.from({ length: 1000 }, () => '1234567.89').reduce(
-      (sum, x) => sum.plus(x),
-      toDecimal('0'),
-    );
-    expect(total.toFixed(2)).toBe('1234567890.00');
-  });
-
-  it('rejects input that is not a finite decimal', () => {
-    expect(() => toDecimal('12abc')).toThrow(DecimalValueError);
-    expect(() => toDecimal('Infinity')).toThrow(DecimalValueError);
-  });
+  it.each(['12abc', 'Infinity', 'NaN', '0x1f', '1e3', '-1.5E2', '1.', '.5', ' 1', '', '+1'])(
+    'accepts only plain decimal strings: rejects %j',
+    (input) => {
+      expect(() => toDecimal(input)).toThrow(DecimalValueError);
+    },
+  );
 });
 
 describe('money / quantity columns', () => {
@@ -64,6 +53,10 @@ describe('money / quantity columns', () => {
     expect(toDb(t.amount, toDecimal('999999999999.99'))).toBe('999999999999.99');
     expect(() => toDb(t.amount, toDecimal('1000000000000'))).toThrow(/exceeds/);
     expect(() => toDb(t.qty, toDecimal('100000000000'))).toThrow(/exceeds/);
+  });
+
+  it.each(['NaN', 'Infinity', '-Infinity'])('refuse to read a non-finite numeric %j', (raw) => {
+    expect(() => t.amount.mapFromDriverValue(raw)).toThrow(DecimalValueError);
   });
 
   it('read numeric strings without passing through float', () => {

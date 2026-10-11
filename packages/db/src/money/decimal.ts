@@ -35,7 +35,16 @@ export class DecimalValueError extends DbError {
   }
 }
 
+const PLAIN_DECIMAL = /^-?\d+(\.\d+)?$/;
+
+/**
+ * Strings must be plain decimals (`-12.50`): no hex, binary, exponent, NaN/Infinity, signs other
+ * than a leading minus, or whitespace, which decimal.js would otherwise accept.
+ */
 export function toDecimal(value: DecimalInput): Decimal {
+  if (typeof value === 'string' && !PLAIN_DECIMAL.test(value)) {
+    throw new DecimalValueError(`not a plain decimal string: ${JSON.stringify(value)}`);
+  }
   let d: Decimal;
   try {
     d = new Decimal(value);
@@ -76,7 +85,7 @@ const decimalColumn = (scale: number, kind: string) =>
   customType<{ data: Decimal; driverData: string }>({
     dataType: () => `numeric(${String(PRECISION)}, ${String(scale)})`,
     // node-postgres returns numeric as a string by default: exact, no float in between.
-    fromDriver: (value) => new Decimal(value),
+    fromDriver: (value) => toDecimal(value), // rejects NaN/Infinity (numeric allows them)
     toDriver: (value) => toNumericString(value, scale, kind),
   });
 
