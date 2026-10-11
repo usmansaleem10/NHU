@@ -12,6 +12,7 @@ describe('loadEnv', () => {
       PORT: 3000,
       LOG_LEVEL: 'info',
       TRUST_PROXY_REQUEST_ID: false,
+      READINESS_CACHE_MS: 1000,
     });
   });
 

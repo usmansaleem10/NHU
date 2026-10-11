@@ -24,6 +24,8 @@ export const envSchema = z
     TRUST_PROXY_REQUEST_ID: flag,
     /** Key material for list cursors (HKDF -> AES-256-GCM). Required in production. */
     CURSOR_SECRET: z.string().min(32).optional(),
+    /** Reuse a readiness report this long, so probe storms do not hammer dependencies. */
+    READINESS_CACHE_MS: z.coerce.number().int().min(0).default(1000),
     /** How long a list cursor stays valid. */
     CURSOR_TTL_SECONDS: z.coerce.number().int().min(1).default(86_400),
   })

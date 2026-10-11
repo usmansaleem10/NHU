@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ReadinessRegistry } from './readiness.registry';
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 const up = () => Promise.resolve();
 const down = () => Promise.reject(new Error('connect ECONNREFUSED 10.0.0.5:5432'));
@@ -67,5 +71,56 @@ describe('ReadinessRegistry', () => {
     expect(() => {
       registry.register({ name: 'postgres', check: up });
     }).toThrow(/postgres/);
+  });
+
+  it('treats a check that throws synchronously as down, leaving no timer behind', async () => {
+    vi.useFakeTimers();
+    const registry = new ReadinessRegistry({ cacheMs: 0 });
+    registry.register({
+      name: 'postgres',
+      check: () => {
+        throw new Error('pool not initialised');
+      },
+    });
+
+    const report = await registry.run();
+
+    expect(report.checks.postgres?.status).toBe('down');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('aborts the signal handed to a check that times out', async () => {
+    const registry = new ReadinessRegistry({ cacheMs: 0 });
+    let received: AbortSignal | undefined;
+    registry.register({
+      name: 'redis',
+      timeoutMs: 20,
+      check: (signal) => {
+        received = signal;
+        return hang();
+      },
+    });
+
+    await registry.run();
+
+    expect(received?.aborted).toBe(true);
+  });
+
+  it('runs checks once for concurrent probes and reuses the report briefly', async () => {
+    let now = 0;
+    const registry = new ReadinessRegistry({ cacheMs: 1000, now: () => now });
+    const check = vi.fn(() => Promise.resolve());
+    registry.register({ name: 'postgres', check });
+
+    await Promise.all([registry.run(), registry.run(), registry.run()]);
+    expect(check).toHaveBeenCalledTimes(1);
+
+    now = 999;
+    await registry.run();
+    expect(check).toHaveBeenCalledTimes(1);
+
+    now = 1001;
+    await registry.run();
+    expect(check).toHaveBeenCalledTimes(2);
   });
 });

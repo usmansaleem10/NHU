@@ -13,6 +13,7 @@ import { ContractModule } from './contract/contract.module';
 import { DocsController } from './contract/docs.controller';
 import { ProblemDetailsFilter } from './errors/problem.filter';
 import { HealthModule } from './health/health.module';
+import { READINESS_OPTIONS } from './health/readiness.registry';
 import { CursorCodec } from './list/cursor';
 import { API_PREFIX } from './api-prefix';
 import { createLoggerOptions } from './logging/logger';
@@ -64,6 +65,7 @@ export class AppModule {
       providers: [
         { provide: ENV, useValue: env },
         { provide: APP_FILTER, useClass: ProblemDetailsFilter },
+        { provide: READINESS_OPTIONS, useValue: { cacheMs: env.READINESS_CACHE_MS } },
         {
           provide: CursorCodec,
           useValue: new CursorCodec(env.CURSOR_SECRET ?? randomBytes(32).toString('hex'), {
@@ -71,7 +73,7 @@ export class AppModule {
           }),
         },
       ],
-      exports: [ENV, CursorCodec],
+      exports: [ENV, CursorCodec, READINESS_OPTIONS],
     };
   }
 }

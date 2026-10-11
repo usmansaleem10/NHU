@@ -3,16 +3,11 @@ import { z } from 'zod';
 
 export const livenessSchema = z.object({ status: z.literal('ok') });
 
-export const checkResultSchema = z.object({
-  status: z.enum(['up', 'down']),
-  durationMs: z.number().nonnegative(),
-});
-
-/** Readiness report. On failure the same `checks` map is sent in a 503 problem+json body. */
-export const readinessSchema = z.object({
-  status: z.enum(['ok', 'unavailable']),
-  checks: z.record(z.string(), checkResultSchema),
-});
+/**
+ * Readiness: overall status only. Dependency names and timings are logged server-side, never
+ * published; a failing probe is a 503 problem+json with code `health.not_ready`.
+ */
+export const readinessSchema = z.object({ status: z.literal('ok') });
 export type ReadinessReport = z.infer<typeof readinessSchema>;
 
 export const healthContract = {
