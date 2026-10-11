@@ -267,19 +267,22 @@ const [{ total }] = await tx
 ## Tenant-isolation test helper (`@hims/db/testing`)
 
 AGENTS.md testing rule 4: every new table or endpoint needs a test proving tenant A cannot read or
-write tenant B's data. Use these instead of hand-rolling it. Add `@testcontainers/postgresql` and
-`drizzle-kit` as devDependencies of the consuming package.
+write tenant B's data. Use these instead of hand-rolling it.
+
+- `@hims/db/testing`: pure helpers (`assertTenantIsolation`, `assertTableTenantIsolation`,
+  `pgErrorOf`), no Docker dependencies.
+- `@hims/db/testing/containers`: `startTestDatabase`, `createTables`, `execAsOwner`. Needs
+  `@testcontainers/postgresql` and `drizzle-kit` as devDependencies of the consuming package, and is
+  repo-local: it finds `docker/postgres/init/01-roles.sql` by walking up to this monorepo's root.
+- `startTestDatabase()` returns `superUrl` (bootstrap superuser, raw inspection only), `ownerUrl`
+  (`hims_owner`: fixture DDL, subject to FORCE RLS) and `appUrl` (`hims_app`: assert through this).
 
 ```ts
-import {
-  assertTableTenantIsolation,
-  assertTenantIsolation,
-  createTables,
-  startTestDatabase,
-} from '@hims/db/testing';
+import { assertTableTenantIsolation, assertTenantIsolation } from '@hims/db/testing';
+import { createTables, startTestDatabase } from '@hims/db/testing/containers';
 import { createDatabase, tenantRlsSql } from '@hims/db';
 
-const pgc = await startTestDatabase(); // postgres:17.11 + hims/hims_app roles + all migrations
+const pgc = await startTestDatabase(); // postgres:17.11 + hims_owner/hims_app roles + all migrations
 // Feature tables already in migrations need nothing more; ad-hoc fixtures:
 await createTables(pgc.ownerUrl, { wards }, tenantRlsSql(wards, { branchScoped: true }));
 const app = createDatabase({ connectionString: pgc.appUrl }); // ALWAYS the app role

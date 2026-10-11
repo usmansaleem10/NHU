@@ -8,7 +8,7 @@ import { createDatabase, type Database } from './client.js';
 import { tenantColumns } from './columns/base.js';
 import { RecordNotFoundError, StaleVersionError } from './errors.js';
 import { updateWithVersion } from './optimistic-lock.js';
-import { createTables, startTestDatabase, type TestDatabase } from './testing/postgres.js';
+import { createTables, startTestDatabase, type TestDatabase } from './testing/containers.js';
 
 const widgets = pgTable('widgets', { ...tenantColumns(), name: text('name').notNull() });
 

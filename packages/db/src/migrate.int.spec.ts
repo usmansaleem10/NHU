@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MigrationRoleError } from './errors.js';
 import { migrationsFolder, runMigrations } from './migrate.js';
 import { TenantRlsMissingError } from './tenancy/rls.js';
-import { startTestDatabase, type TestDatabase } from './testing/postgres.js';
+import { startTestDatabase, type TestDatabase } from './testing/containers.js';
 
 let pgc: TestDatabase;
 

@@ -1,5 +1,4 @@
-// Test-only helpers for integration suites in any workspace. Needs the optional peers
-// @testcontainers/postgresql and drizzle-kit (devDependencies of the consuming package).
-export * from './postgres.js';
+// @hims/db/testing: pure test helpers (no Docker). Container helpers that need the optional
+// peers @testcontainers/postgresql and drizzle-kit live in @hims/db/testing/containers.
 export * from './pg-error.js';
 export * from './tenant-isolation.js';

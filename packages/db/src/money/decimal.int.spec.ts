@@ -8,7 +8,7 @@ import { createDatabase, type Database } from '../client.js';
 import { tenantColumns } from '../columns/base.js';
 import { tenantRlsSql } from '../tenancy/rls.js';
 import { withTenant } from '../tenancy/with-tenant.js';
-import { createTables, startTestDatabase, type TestDatabase } from '../testing/postgres.js';
+import { createTables, startTestDatabase, type TestDatabase } from '../testing/containers.js';
 import { assertTableTenantIsolation } from '../testing/tenant-isolation.js';
 import { decimalFromDb, money, quantity, toDecimal } from './decimal.js';
 

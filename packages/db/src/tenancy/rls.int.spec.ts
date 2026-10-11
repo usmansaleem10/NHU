@@ -12,7 +12,7 @@ import {
   execAsOwner,
   startTestDatabase,
   type TestDatabase,
-} from '../testing/postgres.js';
+} from '../testing/containers.js';
 import { assertTenantTablesHaveRls, findTenantTablesWithoutRls, tenantRlsSql } from './rls.js';
 import { type TenantContext, TenantContextConflictError, withTenant } from './with-tenant.js';
 

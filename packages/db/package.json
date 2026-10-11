@@ -12,6 +12,10 @@
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "default": "./dist/testing/index.js"
+    },
+    "./testing/containers": {
+      "types": "./dist/testing/containers.d.ts",
+      "default": "./dist/testing/containers.js"
     }
   },
   "scripts": {

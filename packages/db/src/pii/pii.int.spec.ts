@@ -9,7 +9,7 @@ import { tenantColumns } from '../columns/base.js';
 import { bytea, tenantKeys } from '../schema/tenant-keys.js';
 import { tenantRlsSql } from '../tenancy/rls.js';
 import { withTenant } from '../tenancy/with-tenant.js';
-import { createTables, startTestDatabase, type TestDatabase } from '../testing/postgres.js';
+import { createTables, startTestDatabase, type TestDatabase } from '../testing/containers.js';
 import { assertTableTenantIsolation } from '../testing/tenant-isolation.js';
 import { DecryptionError, newKey } from './cipher.js';
 import { MissingTenantContextError, PiiKeyring } from './keyring.js';

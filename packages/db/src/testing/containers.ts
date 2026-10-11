@@ -28,6 +28,9 @@ export interface StartTestDatabaseOptions {
 }
 
 /**
+ * Repo-local: the roles file is found by walking up from this module to the monorepo root
+ * (docker/postgres/init/01-roles.sql), so this works only for workspaces inside this repo.
+ *
  * Starts a throwaway Postgres 17 with the same roles as the dev stack (it runs the repo's own
  * docker/postgres/init/01-roles.sql, so test and dev roles cannot drift) and applies all migrations.
  */

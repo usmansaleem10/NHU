@@ -9,7 +9,7 @@ import { tenantIdColumn, uuidV7 } from '../columns/base.js';
 import { assertTenantTablesHaveRls, tenantRlsSql } from '../tenancy/rls.js';
 import { withTenant } from '../tenancy/with-tenant.js';
 import { pgErrorOf } from '../testing/pg-error.js';
-import { execAsOwner, startTestDatabase, type TestDatabase } from '../testing/postgres.js';
+import { execAsOwner, startTestDatabase, type TestDatabase } from '../testing/containers.js';
 import { assertTableTenantIsolation } from '../testing/tenant-isolation.js';
 import {
   ensureMonthlyPartitions,

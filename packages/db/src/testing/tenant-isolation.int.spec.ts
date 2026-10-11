@@ -8,7 +8,7 @@ import { createDatabase, type Database, type DbExecutor } from '../client.js';
 import { tenantColumns } from '../columns/base.js';
 import { updateWithVersion } from '../optimistic-lock.js';
 import { tenantPredicate, tenantRlsSql } from '../tenancy/rls.js';
-import { createTables, startTestDatabase, type TestDatabase } from './postgres.js';
+import { createTables, startTestDatabase, type TestDatabase } from './containers.js';
 import { assertTableTenantIsolation, assertTenantIsolation } from './tenant-isolation.js';
 
 const documents = pgTable('documents', { ...tenantColumns(), title: text('title').notNull() });
