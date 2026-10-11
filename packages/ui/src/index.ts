@@ -34,3 +34,7 @@ export * from './form/problem.js';
 export * from './form/form.js';
 export * from './form/fields.js';
 export * from './form/typeahead.js';
+
+// Patient search (F0-UI-07)
+export * from './patient-search/query.js';
+export * from './patient-search/patient-search.js';

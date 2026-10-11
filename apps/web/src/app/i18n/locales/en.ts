@@ -33,6 +33,15 @@ export const en = {
   'nav.group.foundation': 'Frontend foundation',
   'nav.dataTable': 'Data table',
   'nav.forms': 'Form kit',
+  'nav.patientSearch': 'Patient search',
+
+  'patientSearch.title': 'Patient search',
+  'patientSearch.description':
+    'Shared finder used by registration, billing and wards. Search runs against demo records (dev fixture).',
+  'patientSearch.selectedTitle': 'Selected patient',
+  'patientSearch.noneSelected': 'Search and choose a patient to continue.',
+  'patientSearch.selectedName': 'Name',
+  'patientSearch.selectedMrn': 'MRN',
   'nav.group.administration': 'Administration',
   'nav.masters': 'Master data',
 

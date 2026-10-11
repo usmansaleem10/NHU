@@ -6,6 +6,8 @@
 import {
   createStorageSavedViewsStore,
   type FetchPage,
+  type PatientSearchQuery,
+  type PatientSearchResult,
   type SavedViewsStore,
   type TypeaheadSearch,
 } from '@hims/ui';
@@ -17,6 +19,7 @@ import {
 } from '../dev-fixtures/demo-form';
 import { createDemoPatientSource, type DemoPatient } from '../dev-fixtures/demo-patients';
 import { createDevMasterSources } from '../dev-fixtures/masters';
+import { createPatientSearch } from '../dev-fixtures/patient-search';
 import type { MasterDataSource } from '../features/masters';
 import { createDevSessionSource } from '../dev-fixtures/session';
 import type { SessionSource } from './session/types';
@@ -33,6 +36,11 @@ export interface AppServices {
   submitDemoRegistration: (input: DemoRegistration) => Promise<{ id: string }>;
   /** Simple-master CRUD per resource id (GET/POST/PUT /api/v1/<id>). */
   masters: (masterId: string) => MasterDataSource;
+  /** POST /api/v1/patients/search (identifiers in the body, never the URL). */
+  searchPatients: (
+    query: PatientSearchQuery,
+    signal: AbortSignal,
+  ) => Promise<readonly PatientSearchResult[]>;
 }
 
 function browserStorage(): Storage {
@@ -67,4 +75,5 @@ export const services: AppServices = {
   searchDepartments,
   submitDemoRegistration,
   masters: createDevMasterSources(),
+  searchPatients: createPatientSearch(),
 };

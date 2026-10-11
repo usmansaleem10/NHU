@@ -67,7 +67,7 @@ export const uiMessagesEn = {
   'patientSearch.error.tooShort': 'Enter at least {{count}} characters.',
   'patientSearch.error.cnic': 'CNIC must have 13 digits (5-7-1).',
   'patientSearch.error.phone': 'Enter at least 7 digits.',
-  'patientSearch.results': '{{count}} patients found',
+  'patientSearch.results': 'Patients found: {{count}}',
   'patientSearch.noResults': 'No patient matches this search.',
   'patientSearch.idle': 'Choose what to search by, then enter a value.',
   'patientSearch.select': 'Select {{name}}',
