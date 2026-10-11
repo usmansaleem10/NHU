@@ -57,7 +57,7 @@ beforeAll(async () => {
     'create table not_partitioned (id uuid primary key, at timestamptz)',
   ]);
   app = createDatabase({ connectionString: pgc.appUrl });
-  owner = createDatabase({ connectionString: pgc.ownerUrl });
+  owner = createDatabase({ connectionString: pgc.superUrl }); // raw inspection: bypasses RLS
 });
 
 afterAll(async () => {

@@ -67,7 +67,7 @@ beforeAll(async () => {
   pgc = await startTestDatabase();
   await createTables(pgc.ownerUrl, { patients }, tenantRlsSql(patients));
   app = createDatabase({ connectionString: pgc.appUrl });
-  owner = createDatabase({ connectionString: pgc.ownerUrl });
+  owner = createDatabase({ connectionString: pgc.superUrl }); // raw inspection: bypasses RLS
   await register(A, 'Ayesha', CNIC, PHONE);
   await register(B, 'Bilal', CNIC, PHONE); // same person registered at another hospital
 });

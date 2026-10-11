@@ -5,10 +5,15 @@ pipeline and base columns. Feature tables live in `apps/api/src/features/<featur
 
 ## Roles and connections
 
-| Use                       | Role       | Connection                    | Env var (suggested)      |
-| ------------------------- | ---------- | ----------------------------- | ------------------------ |
-| API / workers at runtime  | `hims_app` | PgBouncer `:6432` (txn pool)  | `DATABASE_URL`           |
-| Migrations, admin         | `hims`     | Postgres direct `:5432`       | `DATABASE_MIGRATION_URL` |
+| Use                      | Role         | Connection                   | Env var (suggested)      |
+| ------------------------ | ------------ | ---------------------------- | ------------------------ |
+| API / workers at runtime | `hims_app`   | PgBouncer `:6432` (txn pool) | `DATABASE_URL`           |
+| Migrations, schema owner | `hims_owner` | Postgres direct `:5432`      | `DATABASE_MIGRATION_URL` |
+| Bootstrap only           | `hims`       | Postgres direct `:5432`      | (none)                   |
+
+`hims_owner` owns every table and function but is **not** a superuser and has no `BYPASSRLS`:
+`SECURITY DEFINER` functions run with no more than owner rights, and `FORCE ROW LEVEL SECURITY`
+binds the owner too. The superuser `hims` only creates roles (`docker/postgres/init/01-roles.sql`).
 
 ```ts
 import { createDatabase } from '@hims/db';
@@ -25,15 +30,19 @@ infrastructure tables from `src/schema/*.ts` and feature tables from
 ```bash
 pnpm --filter @hims/db db:generate                     # diff schema -> new SQL migration (no DB needed)
 pnpm --filter @hims/db db:generate --custom --name=x   # empty SQL file for hand-written DDL
-DATABASE_MIGRATION_URL=postgres://hims:hims@localhost:5432/hims pnpm --filter @hims/db db:migrate
+DATABASE_MIGRATION_URL=postgres://hims_owner:hims_owner@localhost:5432/hims pnpm --filter @hims/db db:migrate
 ```
 
 `db:migrate` (or `runMigrations()` from code):
 
-- refuses to run as `hims_app` (`MigrationRoleError`);
-- takes a session advisory lock, so replicas deploying at once apply migrations exactly once
-  (this is why it must not go through PgBouncer);
-- applies all pending migrations in one transaction.
+- refuses `hims_app` and any superuser/`BYPASSRLS` role (`MigrationRoleError`): only the owner;
+- applies all pending migrations **and** the tenant RLS guard in one transaction it controls, so a
+  migration that leaves a tenant table without forced RLS rolls the whole batch back;
+- takes a transaction-level advisory lock, so replicas deploying at once apply migrations exactly
+  once (direct connection only, never PgBouncer).
+
+Statements Postgres refuses inside a transaction (`CREATE INDEX CONCURRENTLY`, some `ALTER TYPE`)
+cannot go through `db:migrate`; they need a separate, non-transactional step.
 
 There is no `db:seed` here yet: demo tenants need the tenants table (tenancy track).
 
