@@ -7,6 +7,7 @@ export * from './tenancy/rls.js';
 export * from './tenancy/with-tenant.js';
 export * from './partitioning/partitions.js';
 export * from './pii/cipher.js';
+export * from './pii/key-cache.js';
 export * from './pii/keyring.js';
 export * from './pii/master-key.js';
 export * from './pii/normalise.js';

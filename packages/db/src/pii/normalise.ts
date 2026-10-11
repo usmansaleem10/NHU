@@ -22,7 +22,8 @@ export function normaliseCnic(input: string): string {
 /**
  * Pakistani phone -> E.164 (+92 followed by the national number without its trunk 0).
  * Accepts 0300-1234567, 03001234567, 3001234567, 923001234567, +92 300 1234567, 0092...,
- * and landlines such as 042-35761234 or 051-9876543. National numbers are 9-10 digits.
+ * and landlines such as 042-35761234 or 051-9876543. Mobile national numbers are exactly 10
+ * digits; landlines 9-10.
  */
 export function normalisePkPhone(input: string): string {
   const compact = input.replace(/[\s\-().]/g, '');
@@ -36,6 +37,8 @@ export function normalisePkPhone(input: string): string {
   else if (compact.startsWith('0')) national = compact.slice(1);
   else national = compact;
 
+  // Mobiles (3XX...) are exactly 10 national digits; landlines 9-10.
   if (!/^[1-9]\d{8,9}$/.test(national)) throw new InvalidPiiError('phone');
+  if (national.startsWith('3') && national.length !== 10) throw new InvalidPiiError('phone');
   return `+92${national}`;
 }

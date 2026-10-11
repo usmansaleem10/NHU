@@ -185,12 +185,20 @@ CNIC, phone numbers, photos and thumbprint templates are stored encrypted (AGENT
   (`HIMS_MASTER_KEYS="k1:<base64 32 bytes>"`, `HIMS_MASTER_KEY_ID=k1`); production implements the
   same two-method interface over a cloud KMS so the master key never leaves it.
 - **AES-256-GCM** (node:crypto), random 96-bit IV, authenticated with AAD = tenant + field, so a
-  ciphertext copied to another tenant or column fails to decrypt (`DecryptionError`). Each
-  ciphertext carries its data-key version.
+  ciphertext copied to another tenant or column fails to decrypt (`DecryptionError`). Pass
+  `{ recordId }` (the row's UUID v7, known before insert) to also bind it to one record, so it
+  cannot be swapped between patients; decrypt with the same `recordId`. Each ciphertext carries
+  its data-key version.
+- **Key cache**: unwrapped keys are cached per key row (id + wrapped bytes, so a rolled-back or
+  re-wrapped row is never served), bounded by LRU (1000) and TTL (10 min); tune via
+  `new PiiKeyring(provider, { maxEntries, ttlMs })`.
+- **`tenant_keys` is append-only for `hims_app`** (no UPDATE/DELETE/TRUNCATE): rotation inserts;
+  re-wrapping and retiring keys run as `hims_owner`.
 - **Blind index**: HMAC-SHA256 of the normalised value with the tenant's index key. Exact search
   only. Per-tenant keys mean the same CNIC has different indexes in different hospitals.
 - **Normalisation** before indexing: CNIC to 13 digits (`normaliseCnic`), phone to E.164 Pakistan
-  (`normalisePkPhone`: `0300-1234567`, `3001234567`, `+92 300 1234567`, `0092...`, landlines).
+  (`normalisePkPhone`: `0300-1234567`, `3001234567`, `+92 300 1234567`, `0092...`; mobiles exactly
+  10 national digits, landlines 9-10).
   Errors (`InvalidPiiError`) never include the value.
 
 Explicit helpers, not a magic column type: encryption is async (key lookup/unwrap), and Drizzle
@@ -209,12 +217,13 @@ const keyring = new PiiKeyring(LocalMasterKeyProvider.fromEnv()); // one per pro
 
 await withTenant(db, ctx, async (tx) => {
   const pii = await keyring.forTenant(tx); // creates the tenant's keys on first use
-  const cnic = await pii.protectCnic(dto.cnic); // { encrypted, index }
-  await tx.insert(patients).values({ cnicEnc: cnic.encrypted, cnicBidx: cnic.index, ... });
+  const id = newId();
+  const cnic = await pii.protectCnic(dto.cnic, { recordId: id }); // { encrypted, index }
+  await tx.insert(patients).values({ id, cnicEnc: cnic.encrypted, cnicBidx: cnic.index, ... });
 
   const found = await tx.select().from(patients)
     .where(eq(patients.cnicBidx, await pii.cnicIndex(query))); // exact match, any spelling
-  const plain = await pii.decrypt('cnic', found[0].cnicEnc);  // '3520212345671'
+  const plain = await pii.decrypt('cnic', found[0].cnicEnc, { recordId: found[0].id });
 });
 ```
 

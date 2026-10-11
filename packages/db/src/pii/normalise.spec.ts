@@ -43,6 +43,7 @@ describe('normalisePkPhone', () => {
   it.each([
     '+14155552671',
     '0300123',
+    '0300123456', // mobile with 9 national digits: mobiles are exactly 10
     '030012345678',
     '00300-1234567',
     'phone',

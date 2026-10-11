@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto';
+
 import { and, eq, sql } from 'drizzle-orm';
 
 import type { DbExecutor } from '../client.js';
 import { DbError } from '../errors.js';
 import { tenantKeys } from '../schema/tenant-keys.js';
 import { decrypt, encrypt, hmac, keyVersionOf, newKey } from './cipher.js';
+import { KeyCache, type KeyCacheOptions } from './key-cache.js';
 import type { MasterKeyProvider } from './master-key.js';
 import { normaliseCnic, normalisePkPhone } from './normalise.js';
 
@@ -32,20 +35,29 @@ export interface ProtectedValue {
   index: Buffer;
 }
 
+/**
+ * Binds a ciphertext to one record (its id goes into the AAD), so it cannot be copied onto another
+ * row of the same tenant and column. Pass the same recordId to decrypt. Ids are UUID v7 generated
+ * in the app, so they are known before insert.
+ */
+export interface PiiBinding {
+  recordId?: string | undefined;
+}
+
 /** PII operations for one tenant. Obtain with PiiKeyring.forTenant(tx) inside withTenant. */
 export interface TenantPii {
   readonly tenantId: string;
-  /** AES-256-GCM with the tenant's newest data key; bound to tenant + field. */
-  encrypt(field: string, value: string): Promise<Buffer>;
-  decrypt(field: string, ciphertext: Buffer): Promise<string>;
+  /** AES-256-GCM with the tenant's newest data key; bound to tenant + field (+ recordId). */
+  encrypt(field: string, value: string, binding?: PiiBinding): Promise<Buffer>;
+  decrypt(field: string, ciphertext: Buffer, binding?: PiiBinding): Promise<string>;
   /** Same, for binary PII (photo, thumbprint template). */
-  encryptBytes(field: string, value: Buffer): Promise<Buffer>;
-  decryptBytes(field: string, ciphertext: Buffer): Promise<Buffer>;
+  encryptBytes(field: string, value: Buffer, binding?: PiiBinding): Promise<Buffer>;
+  decryptBytes(field: string, ciphertext: Buffer, binding?: PiiBinding): Promise<Buffer>;
   /** HMAC-SHA256 of an already-normalised value with the tenant's index key. */
   blindIndex(field: string, normalisedValue: string): Promise<Buffer>;
   /** Normalise + encrypt + index. Throws InvalidPiiError on malformed input. */
-  protectCnic(raw: string): Promise<ProtectedValue>;
-  protectPhone(raw: string): Promise<ProtectedValue>;
+  protectCnic(raw: string, binding?: PiiBinding): Promise<ProtectedValue>;
+  protectPhone(raw: string, binding?: PiiBinding): Promise<ProtectedValue>;
   /** Blind index for searching: normalises first, so any spelling finds the record. */
   cnicIndex(raw: string): Promise<Buffer>;
   phoneIndex(raw: string): Promise<Buffer>;
@@ -53,7 +65,15 @@ export interface TenantPii {
 
 const wrapContext = (tenantId: string, purpose: Purpose, version: number) =>
   `hims:tenant-key:${tenantId}:${purpose}:${String(version)}`;
-const dataContext = (tenantId: string, field: string) => `hims:pii:${tenantId}:${field}`;
+const dataContext = (tenantId: string, field: string, binding?: PiiBinding) =>
+  binding?.recordId
+    ? `hims:pii:${tenantId}:${field}:${binding.recordId}`
+    : `hims:pii:${tenantId}:${field}`;
+
+/** Cache identity = the exact key row (id) and its wrapped bytes, never tenant/purpose/version:
+ *  a rolled-back or re-wrapped row must not be served from cache. */
+const cacheKeyOf = (row: { id: string; masterKeyId: string; wrappedKey: Buffer }) =>
+  `${row.id}:${createHash('sha256').update(row.masterKeyId).update(row.wrappedKey).digest('hex')}`;
 
 async function currentTenantId(tx: DbExecutor): Promise<string> {
   const result = await tx.execute<{ tenant_id: string | null }>(
@@ -66,12 +86,17 @@ async function currentTenantId(tx: DbExecutor): Promise<string> {
 
 /**
  * Envelope encryption for PII. One instance per process (it caches unwrapped tenant keys in
- * memory); the master key provider is the only place a master key lives.
+ * memory, bounded by LRU + TTL); the master key provider is the only place a master key lives.
  */
 export class PiiKeyring {
-  readonly #unwrapped = new Map<string, Promise<Buffer>>();
+  readonly #unwrapped: KeyCache<Promise<Buffer>>;
 
-  constructor(private readonly provider: MasterKeyProvider) {}
+  constructor(
+    private readonly provider: MasterKeyProvider,
+    cache: KeyCacheOptions = {},
+  ) {
+    this.#unwrapped = new KeyCache(cache);
+  }
 
   /** Loads (creating on first use) the current tenant's keys. tx must be a withTenant transaction. */
   async forTenant(tx: DbExecutor): Promise<TenantPii> {
@@ -87,7 +112,7 @@ export class PiiKeyring {
     const key = (purpose: Purpose, version: number): Promise<Buffer> => {
       const row = wrapped.get(`${purpose}:${String(version)}`);
       if (!row) throw new UnknownKeyVersionError(purpose, version);
-      const cacheKey = `${tenantId}:${purpose}:${String(version)}`;
+      const cacheKey = cacheKeyOf(row);
       let unwrapped = this.#unwrapped.get(cacheKey);
       if (!unwrapped) {
         unwrapped = this.provider.unwrap(
@@ -95,7 +120,9 @@ export class PiiKeyring {
           row.wrappedKey,
           wrapContext(tenantId, purpose, version),
         );
-        unwrapped.catch(() => this.#unwrapped.delete(cacheKey));
+        unwrapped.catch(() => {
+          this.#unwrapped.delete(cacheKey);
+        });
         this.#unwrapped.set(cacheKey, unwrapped);
       }
       return unwrapped;
@@ -107,31 +134,40 @@ export class PiiKeyring {
       ...rows.filter((r) => r.purpose === 'index').map((r) => r.keyVersion),
     );
 
-    const encryptBytes = async (field: string, value: Buffer) =>
-      encrypt(await key('data', latestData), latestData, value, dataContext(tenantId, field));
-    const decryptBytes = async (field: string, ciphertext: Buffer) =>
+    const encryptBytes = async (field: string, value: Buffer, binding?: PiiBinding) =>
+      encrypt(
+        await key('data', latestData),
+        latestData,
+        value,
+        dataContext(tenantId, field, binding),
+      );
+    const decryptBytes = async (field: string, ciphertext: Buffer, binding?: PiiBinding) =>
       decrypt(
         await key('data', keyVersionOf(ciphertext)),
         ciphertext,
-        dataContext(tenantId, field),
+        dataContext(tenantId, field, binding),
       );
     const blindIndex = async (field: string, normalisedValue: string) =>
       hmac(await key('index', indexVersion), field, normalisedValue);
-    const protect = async (field: string, normalised: string): Promise<ProtectedValue> => ({
-      encrypted: await encryptBytes(field, Buffer.from(normalised, 'utf8')),
+    const protect = async (
+      field: string,
+      normalised: string,
+      binding?: PiiBinding,
+    ): Promise<ProtectedValue> => ({
+      encrypted: await encryptBytes(field, Buffer.from(normalised, 'utf8'), binding),
       index: await blindIndex(field, normalised),
     });
 
     return {
       tenantId,
-      encrypt: (field, value) => encryptBytes(field, Buffer.from(value, 'utf8')),
-      decrypt: async (field, ciphertext) =>
-        (await decryptBytes(field, ciphertext)).toString('utf8'),
+      encrypt: (field, value, binding) => encryptBytes(field, Buffer.from(value, 'utf8'), binding),
+      decrypt: async (field, ciphertext, binding) =>
+        (await decryptBytes(field, ciphertext, binding)).toString('utf8'),
       encryptBytes,
       decryptBytes,
       blindIndex,
-      protectCnic: (raw) => protect('cnic', normaliseCnic(raw)),
-      protectPhone: (raw) => protect('phone', normalisePkPhone(raw)),
+      protectCnic: (raw, binding) => protect('cnic', normaliseCnic(raw), binding),
+      protectPhone: (raw, binding) => protect('phone', normalisePkPhone(raw), binding),
       cnicIndex: (raw) => blindIndex('cnic', normaliseCnic(raw)),
       phoneIndex: (raw) => blindIndex('phone', normalisePkPhone(raw)),
     };
@@ -153,6 +189,7 @@ export class PiiKeyring {
   #load(tx: DbExecutor) {
     return tx
       .select({
+        id: tenantKeys.id,
         purpose: tenantKeys.purpose,
         keyVersion: tenantKeys.keyVersion,
         masterKeyId: tenantKeys.masterKeyId,

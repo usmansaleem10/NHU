@@ -10,6 +10,7 @@ import { bytea, tenantKeys } from '../schema/tenant-keys.js';
 import { tenantRlsSql } from '../tenancy/rls.js';
 import { withTenant } from '../tenancy/with-tenant.js';
 import { createTables, startTestDatabase, type TestDatabase } from '../testing/containers.js';
+import { pgErrorOf } from '../testing/pg-error.js';
 import { assertTableTenantIsolation } from '../testing/tenant-isolation.js';
 import { DecryptionError, newKey } from './cipher.js';
 import { MissingTenantContextError, PiiKeyring } from './keyring.js';
@@ -33,7 +34,8 @@ const B = randomUUID();
 let pgc: TestDatabase;
 let app: Database;
 let owner: Database;
-const keyring = new PiiKeyring(new LocalMasterKeyProvider({ k1: newKey() }, 'k1'));
+const provider = new LocalMasterKeyProvider({ k1: newKey() }, 'k1');
+const keyring = new PiiKeyring(provider);
 
 const register = (tenantId: string, name: string, cnic: string, phone: string) =>
   withTenant(app.db, { tenantId, branchId: 'all' }, async (tx) => {
@@ -160,6 +162,59 @@ describe('data key rotation', () => {
       };
     });
     expect(result).toEqual({ version: 2, versions: [1, 2], plain: ['old', 'new'], index: true });
+  });
+});
+
+describe('key cache', () => {
+  it('never serves a cached key whose row was rolled back', async () => {
+    const context = { tenantId: randomUUID(), branchId: 'all' };
+    await expect(
+      withTenant(app.db, context, async (tx) => {
+        await (await keyring.forTenant(tx)).encrypt('cnic', 'lost'); // creates + caches keys
+        throw new Error('rollback');
+      }),
+    ).rejects.toThrow('rollback');
+
+    const kept = await withTenant(app.db, context, async (tx) =>
+      (await keyring.forTenant(tx)).encrypt('cnic', 'kept'),
+    );
+
+    const fresh = new PiiKeyring(provider); // e.g. another API replica, or after a restart
+    expect(
+      await withTenant(app.db, context, async (tx) =>
+        (await fresh.forTenant(tx)).decrypt('cnic', kept),
+      ),
+    ).toBe('kept');
+  });
+});
+
+describe('record binding', () => {
+  it('refuses a ciphertext swapped onto another record when encrypted with a recordId', async () => {
+    const [first, second] = [randomUUID(), randomUUID()];
+    const error = await withTenant(app.db, { tenantId: A, branchId: 'all' }, async (tx) => {
+      const pii = await keyring.forTenant(tx);
+      const ofFirst = await pii.encrypt('cnic', '3520212345671', { recordId: first });
+      expect(await pii.decrypt('cnic', ofFirst, { recordId: first })).toBe('3520212345671');
+      return pii.decrypt('cnic', ofFirst, { recordId: second }).then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+    });
+    expect(error).toBeInstanceOf(DecryptionError);
+  });
+});
+
+describe('tenant_keys is append-only for the app role', () => {
+  it('cannot update or delete even its own tenant keys', async () => {
+    const context = { tenantId: randomUUID(), branchId: 'all' };
+    await withTenant(app.db, context, (tx) => keyring.forTenant(tx));
+
+    const update = await pgErrorOf(
+      withTenant(app.db, context, (tx) => tx.update(tenantKeys).set({ masterKeyId: 'x' })),
+    );
+    const remove = await pgErrorOf(withTenant(app.db, context, (tx) => tx.delete(tenantKeys)));
+    expect([update.code, remove.code]).toEqual(['42501', '42501']);
+    expect(update.message).toMatch(/permission denied/);
   });
 });
 
