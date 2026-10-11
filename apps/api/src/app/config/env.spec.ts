@@ -71,6 +71,14 @@ describe('loadEnv', () => {
     ).toHaveLength(32);
   });
 
+  it('defaults cursor lifetime to 24 hours and accepts an override', () => {
+    expect(loadEnv({ NODE_ENV: 'test' }).CURSOR_TTL_SECONDS).toBe(86_400);
+    expect(loadEnv({ NODE_ENV: 'test', CURSOR_TTL_SECONDS: '600' }).CURSOR_TTL_SECONDS).toBe(600);
+    expect(() => loadEnv({ NODE_ENV: 'test', CURSOR_TTL_SECONDS: '0' })).toThrow(
+      /CURSOR_TTL_SECONDS/,
+    );
+  });
+
   it('lets development run without a cursor secret', () => {
     expect(loadEnv({ NODE_ENV: 'development' }).CURSOR_SECRET).toBeUndefined();
   });

@@ -66,7 +66,9 @@ export class AppModule {
         { provide: APP_FILTER, useClass: ProblemDetailsFilter },
         {
           provide: CursorCodec,
-          useValue: new CursorCodec(env.CURSOR_SECRET ?? randomBytes(32).toString('hex')),
+          useValue: new CursorCodec(env.CURSOR_SECRET ?? randomBytes(32).toString('hex'), {
+            ttlMs: env.CURSOR_TTL_SECONDS * 1000,
+          }),
         },
       ],
       exports: [ENV, CursorCodec],

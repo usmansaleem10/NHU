@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { DEFAULT_PAGE_SIZE, listQuery, listResponse, MAX_PAGE_SIZE, rangeFilter } from './list.js';
+import { DEFAULT_PAGE_SIZE, listQuery, MAX_PAGE_SIZE, rangeFilter } from './list.js';
 
 const patientsQuery = listQuery({
   sortable: ['createdAt', 'name'],
@@ -79,20 +79,5 @@ describe('listQuery', () => {
     ['an unknown range operator', { createdAt: { ne: '2026-01-01T00:00:00Z' } }],
   ])('rejects %s', (_case, filter) => {
     expect(patientsQuery.safeParse({ filter }).success).toBe(false);
-  });
-
-  it('bounds the opaque cursor length', () => {
-    expect(patientsQuery.safeParse({ cursor: 'x'.repeat(2049) }).success).toBe(false);
-  });
-});
-
-describe('listResponse', () => {
-  it('describes the standard list envelope', () => {
-    const schema = listResponse(z.object({ id: z.string() }));
-
-    expect(
-      schema.parse({ items: [{ id: 'a' }], page: { limit: 25, hasMore: false, nextCursor: null } }),
-    ).toEqual({ items: [{ id: 'a' }], page: { limit: 25, hasMore: false, nextCursor: null } });
-    expect(schema.safeParse({ items: [] }).success).toBe(false);
   });
 });

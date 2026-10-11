@@ -14,9 +14,27 @@ interface Row {
 
 type Field = 'createdAt' | 'name';
 
-const codec = new CursorCodec('test-secret-test-secret-test-secret');
+const context = {
+  codec: new CursorCodec('test-secret-test-secret-test-secret'),
+  resource: 'patients',
+  scope: { tenantId: 'tenant-a', userId: 'user-1' },
+};
 
-function compare(a: CursorValue, b: CursorValue): number {
+// Postgres-like timestamptz comparison: microsecond precision, whatever the text format.
+function toMicros(value: string): bigint {
+  const match = /^(.{19})(?:\.(\d{1,6}))?(.*)$/.exec(value.replace('T', ' '));
+  if (!match) throw new Error(`not a timestamp: ${value}`);
+  const [, seconds = '', fraction = '', zone = ''] = match;
+  const offset = zone === 'Z' || zone === '' ? '+00:00' : zone.length === 3 ? `${zone}:00` : zone;
+  const millis = Date.parse(`${seconds.replace(' ', 'T')}${offset}`);
+  return BigInt(millis) * 1000n + BigInt(fraction.padEnd(6, '0'));
+}
+
+function compareField(field: keyof Row, a: CursorValue, b: CursorValue): number {
+  if (field === 'createdAt' && typeof a === 'string' && typeof b === 'string') {
+    const [x, y] = [toMicros(a), toMicros(b)];
+    return x === y ? 0 : x < y ? -1 : 1;
+  }
   if (a === b) return 0;
   return a < b ? -1 : 1;
 }
@@ -26,7 +44,7 @@ function matches(row: Row, predicate: KeysetPredicate<keyof Row> | undefined): b
   if (!predicate) return true;
   return predicate.anyOf.some((conditions) =>
     conditions.every(({ field, op, value }) => {
-      const order = compare(row[field], value);
+      const order = compareField(field, row[field], value);
       return op === 'eq' ? order === 0 : op === 'gt' ? order > 0 : order < 0;
     }),
   );
@@ -40,7 +58,7 @@ function fakeTable(rows: Row[]) {
         .filter((row) => matches(row, request.after))
         .sort((a, b) => {
           for (const { field, direction } of request.sort) {
-            const order = compare(a[field], b[field]);
+            const order = compareField(field, a[field], b[field]);
             if (order !== 0) return direction === 'asc' ? order : -order;
           }
           return 0;
@@ -62,7 +80,7 @@ async function readAll(
   const seen: string[] = [];
   let cursor: string | undefined;
   for (let pageIndex = 0; pageIndex < 50; pageIndex++) {
-    const page = await listPage(table, { limit, sort, cursor }, codec, keyOf);
+    const page = await listPage(table, { limit, sort, cursor }, context, keyOf);
     seen.push(...page.items.map((row) => row.id));
     between?.(pageIndex);
     if (!page.page.hasMore) {
@@ -180,7 +198,7 @@ describe('listPage', () => {
       },
     };
 
-    const page = await listPage(spy, { limit: 7, sort: newestFirst }, codec, keyOf);
+    const page = await listPage(spy, { limit: 7, sort: newestFirst }, context, keyOf);
 
     expect(requests[0]?.fetchLimit).toBe(8);
     expect(page.items).toHaveLength(7);
@@ -189,7 +207,7 @@ describe('listPage', () => {
 
   it('rejects a cursor from a differently sorted listing', async () => {
     const table = fakeTable(seed());
-    const first = await listPage(table, { limit: 2, sort: newestFirst }, codec, keyOf);
+    const first = await listPage(table, { limit: 2, sort: newestFirst }, context, keyOf);
 
     await expect(
       listPage(
@@ -199,9 +217,35 @@ describe('listPage', () => {
           sort: [{ field: 'name', direction: 'asc' }],
           cursor: first.page.nextCursor ?? '',
         },
-        codec,
+        context,
         keyOf,
       ),
     ).rejects.toMatchObject({ code: 'list.cursor_invalid' });
+  });
+
+  it('pages correctly through microsecond timestamps when keys are the DB text', async () => {
+    // Same millisecond, different microseconds: a JS Date (ms) key would repeat or skip rows.
+    const table = fakeTable([
+      row('p-1', '2026-10-01 08:00:00.123999+00'),
+      row('p-2', '2026-10-01 08:00:00.123456+00'),
+      row('p-3', '2026-10-01 08:00:00.123001+00'),
+      row('p-4', '2026-10-01 08:00:00.122+00'),
+    ]);
+
+    expect(await readAll(table, newestFirst, 1)).toEqual(['p-1', 'p-2', 'p-3', 'p-4']);
+  });
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['a Date (ms precision)', new Date('2026-10-01T08:00:00.123Z')],
+    ['NaN', Number.NaN],
+  ])('refuses to build a cursor from a %s key value', async (_case, bad) => {
+    const table = fakeTable(seed());
+    const badKeyOf = () => () => [bad, 'p-1'] as unknown as CursorValue[];
+
+    await expect(
+      listPage(table, { limit: 1, sort: newestFirst }, context, badKeyOf),
+    ).rejects.toThrow(/key value/);
   });
 });

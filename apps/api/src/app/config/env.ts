@@ -22,8 +22,10 @@ export const envSchema = z
     API_DOCS_ENABLED: flag,
     /** Reuse an incoming x-request-id only when a trusted proxy sets it. */
     TRUST_PROXY_REQUEST_ID: flag,
-    /** HMAC key for list cursors. Required in production; a per-process random key otherwise. */
+    /** Key material for list cursors (HKDF -> AES-256-GCM). Required in production. */
     CURSOR_SECRET: z.string().min(32).optional(),
+    /** How long a list cursor stays valid. */
+    CURSOR_TTL_SECONDS: z.coerce.number().int().min(1).default(86_400),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && env.CURSOR_SECRET === undefined) {

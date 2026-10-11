@@ -1,7 +1,7 @@
 import type { ListResult, SortTerm } from '@hims/contracts';
 
 import { ValidationError } from '../errors/domain-error';
-import type { CursorCodec, CursorValue } from './cursor';
+import type { CursorBinding, CursorCodec, CursorScope, CursorValue } from './cursor';
 
 export type { CursorValue } from './cursor';
 
@@ -82,23 +82,69 @@ export function keysetPredicate<F extends string>(
   };
 }
 
+/** Per-request context: the codec plus what every cursor of this listing is bound to. */
+export interface ListContext {
+  codec: CursorCodec;
+  /** Listing identifier, e.g. `patients`. */
+  resource: string;
+  /** Tenant/user the cursor belongs to (from the session; never from the client). */
+  scope: CursorScope;
+}
+
 /**
- * Runs one keyset page: decodes the cursor, asks the source for limit + 1 rows, and builds
- * the standard list envelope. `keyOf(sort)` returns a row's values for those sort fields
- * (dates as ISO strings) and must only use non-null columns.
+ * Returns a row's key values for `sort`, in order. Contract:
+ * - every value must be non-null (sortable columns are NOT NULL);
+ * - timestamps must be the database's own text for the column (select `col::text` alongside
+ *   the row), never a JS Date: Postgres keeps microseconds, Date keeps milliseconds, and a
+ *   truncated key repeats or skips rows that share a millisecond. Alternatively declare the
+ *   column `timestamptz(3)`.
+ */
+export type KeyOf<Row, F extends string> = (
+  sort: readonly SortTerm<F>[],
+) => (row: Row) => CursorValue[];
+
+function assertKeyValues(values: readonly unknown[], expected: number): CursorValue[] {
+  if (values.length !== expected) {
+    throw new Error(
+      `keyOf returned ${String(values.length)} key values for ${String(expected)} sort terms`,
+    );
+  }
+  for (const value of values) {
+    const valid =
+      typeof value === 'string' ||
+      typeof value === 'boolean' ||
+      (typeof value === 'number' && Number.isFinite(value));
+    if (!valid) {
+      // A programming error in the repository (500), never a client error.
+      throw new Error(
+        'keyOf returned an invalid key value: use non-null columns and DB text for timestamps',
+      );
+    }
+  }
+  return values as CursorValue[];
+}
+
+/**
+ * Runs one keyset page: decodes the cursor (bound to resource, scope, sort and filter), asks
+ * the source for limit + 1 rows, and builds the standard list envelope.
  */
 export async function listPage<Row, F extends string, Filter>(
   source: KeysetPageSource<Row, F | 'id', Filter>,
   query: ListQueryInput<F, Filter>,
-  codec: CursorCodec,
-  keyOf: (sort: readonly SortTerm<F | 'id'>[]) => (row: Row) => CursorValue[],
+  context: ListContext,
+  keyOf: KeyOf<Row, F | 'id'>,
 ): Promise<ListResult<Row>> {
   const sort = toKeysetSort(query.sort);
-  const signature = sortSignature(sort);
+  const binding: CursorBinding = {
+    resource: context.resource,
+    scope: context.scope,
+    sort: sortSignature(sort),
+    filter: query.filter ?? null,
+  };
   const after =
     query.cursor === undefined
       ? undefined
-      : keysetPredicate(sort, codec.decode(query.cursor, signature));
+      : keysetPredicate(sort, context.codec.decode(query.cursor, binding));
 
   const rows = await source.findPage({
     sort,
@@ -110,12 +156,9 @@ export async function listPage<Row, F extends string, Filter>(
   const hasMore = rows.length > query.limit;
   const items = hasMore ? rows.slice(0, query.limit) : rows;
   const last = items.at(-1);
-  return {
-    items,
-    page: {
-      limit: query.limit,
-      hasMore,
-      nextCursor: hasMore && last !== undefined ? codec.encode(signature, keyOf(sort)(last)) : null,
-    },
-  };
+  const nextCursor =
+    hasMore && last !== undefined
+      ? context.codec.encode(binding, assertKeyValues(keyOf(sort)(last), sort.length))
+      : null;
+  return { items, page: { limit: query.limit, hasMore, nextCursor } };
 }
