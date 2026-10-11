@@ -52,8 +52,18 @@ function cursorError(code: 'list.cursor_invalid' | 'list.cursor_expired'): Valid
   });
 }
 
-/** JSON with object keys sorted at every level, so equal filters hash equally. */
-function canonicalJson(value: unknown): string {
+function hasToJSON(value: object): value is { toJSON: () => unknown } {
+  return typeof (value as { toJSON?: unknown }).toJSON === 'function';
+}
+
+/**
+ * JSON with object keys sorted at every level, so equal filters hash equally. Mirrors
+ * JSON.stringify for `toJSON` (a Date binds by its instant) and encodes bigint as `"<n>n"`.
+ */
+function canonicalJson(input: unknown): string {
+  const value =
+    input !== null && typeof input === 'object' && hasToJSON(input) ? input.toJSON() : input;
+  if (typeof value === 'bigint') return JSON.stringify(`${value.toString()}n`);
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   if (value !== null && typeof value === 'object') {
     const entries = Object.entries(value)
@@ -61,7 +71,10 @@ function canonicalJson(value: unknown): string {
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(',')}}`;
   }
-  return value === undefined ? 'null' : JSON.stringify(value);
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return JSON.stringify(value);
+  }
+  return 'null';
 }
 
 function associatedData(binding: CursorBinding): Buffer {
