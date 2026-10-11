@@ -5,6 +5,7 @@ import { I18nextProvider } from 'react-i18next';
 
 import { AppErrorBoundary } from './errors';
 import { i18n } from './i18n/i18n';
+import { UiBridge } from './i18n/ui-bridge';
 import { createQueryClient } from './query-client';
 import { createAppRouter } from './router';
 import { ColorSchemeProvider } from './theme';
@@ -15,11 +16,13 @@ export function App() {
   return (
     <I18nextProvider i18n={i18n}>
       <AppErrorBoundary>
-        <ColorSchemeProvider>
-          <QueryClientProvider client={queryClient}>
-            <RouterProvider router={router} />
-          </QueryClientProvider>
-        </ColorSchemeProvider>
+        <UiBridge>
+          <ColorSchemeProvider>
+            <QueryClientProvider client={queryClient}>
+              <RouterProvider router={router} />
+            </QueryClientProvider>
+          </ColorSchemeProvider>
+        </UiBridge>
       </AppErrorBoundary>
     </I18nextProvider>
   );

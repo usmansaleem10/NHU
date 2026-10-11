@@ -13,4 +13,10 @@ export const dataTableRoute = createRoute({
   validateSearch: validateTableSearch,
 }).lazy(() => import('./routes/data-table.lazy').then((m) => m.Route));
 
-export const foundationRoutes = [dataTableRoute] as const;
+export const formsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/foundation/forms',
+  staticData: { access: { module: 'foundation', permission: 'foundation.form.view' } },
+}).lazy(() => import('./routes/forms.lazy').then((m) => m.Route));
+
+export const foundationRoutes = [dataTableRoute, formsRoute] as const;

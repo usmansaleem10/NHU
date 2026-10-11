@@ -3,8 +3,18 @@
  * today the implementations are DEV FIXTURES (src/dev-fixtures). When F0-API's typed contracts
  * client lands, swap each fixture for the API-backed implementation here — screens don't change.
  */
-import { createStorageSavedViewsStore, type FetchPage, type SavedViewsStore } from '@hims/ui';
+import {
+  createStorageSavedViewsStore,
+  type FetchPage,
+  type SavedViewsStore,
+  type TypeaheadSearch,
+} from '@hims/ui';
 
+import {
+  searchDepartments,
+  submitDemoRegistration,
+  type DemoRegistration,
+} from '../dev-fixtures/demo-form';
 import { createDemoPatientSource, type DemoPatient } from '../dev-fixtures/demo-patients';
 import { createDevSessionSource } from '../dev-fixtures/session';
 import type { SessionSource } from './session/types';
@@ -15,6 +25,10 @@ export interface AppServices {
   demoPatients: FetchPage<DemoPatient>;
   /** Per-user saved table views. Browser storage now; a user-preferences endpoint later. */
   savedViews: SavedViewsStore;
+  /** Typeahead endpoint (GET /api/v1/departments?search&limit), at most 50 results. */
+  searchDepartments: TypeaheadSearch;
+  /** Form-kit reference submit; throws ProblemError (problem+json) on validation failure. */
+  submitDemoRegistration: (input: DemoRegistration) => Promise<{ id: string }>;
 }
 
 function browserStorage(): Storage {
@@ -46,4 +60,6 @@ export const services: AppServices = {
   session: createDevSessionSource(),
   demoPatients: createDemoPatientSource(),
   savedViews: createStorageSavedViewsStore(browserStorage()),
+  searchDepartments,
+  submitDemoRegistration,
 };

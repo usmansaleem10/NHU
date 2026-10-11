@@ -31,3 +31,6 @@ export * from './data-table/toolbar.js';
 
 // Form kit (F0-UI-04)
 export * from './form/problem.js';
+export * from './form/form.js';
+export * from './form/fields.js';
+export * from './form/typeahead.js';
