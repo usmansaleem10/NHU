@@ -27,8 +27,8 @@ const isEmpty = (value: unknown): boolean =>
   value === undefined || value === null || (Array.isArray(value) && value.length === 0);
 
 const randomTenants = (): readonly [TenantContext, TenantContext] => [
-  { tenantId: randomUUID() },
-  { tenantId: randomUUID() },
+  { tenantId: randomUUID(), branchId: 'all' },
+  { tenantId: randomUUID(), branchId: 'all' },
 ];
 
 /** Run fn as tenant; a thrown error counts as "blocked", which is what we want. */

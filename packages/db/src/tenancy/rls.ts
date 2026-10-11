@@ -24,7 +24,8 @@ export function qualifiedName(table: PgTable | string): string {
 /**
  * The row predicate every tenant table uses. `(select fn())` makes Postgres evaluate the context
  * once per query (an InitPlan), so the tenant_id index is usable.
- * Branch-scoped tables: no branch in context means tenant-wide (all branches of the tenant).
+ * Branch-scoped tables: app.branch_id is empty only when withTenant was given branchId 'all'
+ * (explicit tenant-wide access); otherwise rows are confined to that branch.
  */
 export function tenantPredicate(options: TenantRlsOptions = {}): string {
   const tenant = 'tenant_id = (select app_current_tenant_id())';
@@ -35,7 +36,8 @@ export function tenantPredicate(options: TenantRlsOptions = {}): string {
 /**
  * DDL that puts a table under tenant isolation: ENABLE + FORCE row level security and one
  * permissive policy whose USING and WITH CHECK are the tenant predicate, so rows can be neither
- * seen nor written across tenants. FORCE makes the policy bind the table owner too.
+ * seen nor written across tenants. FORCE makes the policy bind the table owner (hims_owner, which
+ * is not a superuser) too; only the bootstrap superuser bypasses it.
  *
  * Put the output in the table's migration (drizzle-kit does not emit FORCE):
  *   pnpm --filter @hims/db db:rls <table> [--branch]
@@ -50,7 +52,7 @@ export function tenantRlsSql(table: PgTable | string, options: TenantRlsOptions 
   ];
 }
 
-export type RlsProblem = 'rls_disabled' | 'rls_not_forced' | 'no_policy';
+export type RlsProblem = 'rls_disabled' | 'rls_not_forced' | 'no_tenant_policy';
 
 export interface TenantTableRlsViolation {
   table: string;
@@ -59,7 +61,8 @@ export interface TenantTableRlsViolation {
 
 /**
  * Every table (or partition) with a tenant_id column must have RLS enabled and forced, and every
- * non-partition one must carry a policy. Partitions need no policy: through the parent the
+ * non-partition one must carry a permissive policy named tenant_isolation for ALL commands with
+ * both USING and WITH CHECK (what tenantRlsSql emits). Partitions need no policy: through the parent the
  * parent's policy applies, and direct access with RLS on and no policy returns nothing.
  */
 export async function findTenantTablesWithoutRls(
@@ -70,13 +73,17 @@ export async function findTenantTablesWithoutRls(
     enabled: boolean;
     forced: boolean;
     is_partition: boolean;
-    has_policy: boolean;
+    has_tenant_policy: boolean;
   }>(sql`
     select format('%I.%I', n.nspname, c.relname) as name,
            c.relrowsecurity as enabled,
            c.relforcerowsecurity as forced,
            c.relispartition as is_partition,
-           exists (select 1 from pg_policy p where p.polrelid = c.oid) as has_policy
+           exists (
+             select 1 from pg_policy p
+              where p.polrelid = c.oid and p.polname = ${TENANT_POLICY} and p.polcmd = '*'
+                and p.polpermissive and p.polqual is not null and p.polwithcheck is not null
+           ) as has_tenant_policy
       from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
       join pg_attribute a on a.attrelid = c.oid and a.attname = 'tenant_id' and not a.attisdropped
@@ -89,7 +96,7 @@ export async function findTenantTablesWithoutRls(
     const problems: RlsProblem[] = [];
     if (!row.enabled) problems.push('rls_disabled');
     if (!row.forced) problems.push('rls_not_forced');
-    if (!row.is_partition && !row.has_policy) problems.push('no_policy');
+    if (!row.is_partition && !row.has_tenant_policy) problems.push('no_tenant_policy');
     return problems.length > 0 ? [{ table: row.name, problems }] : [];
   });
 }

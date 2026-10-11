@@ -36,7 +36,7 @@ let owner: Database;
 const keyring = new PiiKeyring(new LocalMasterKeyProvider({ k1: newKey() }, 'k1'));
 
 const register = (tenantId: string, name: string, cnic: string, phone: string) =>
-  withTenant(app.db, { tenantId }, async (tx) => {
+  withTenant(app.db, { tenantId, branchId: 'all' }, async (tx) => {
     const pii = await keyring.forTenant(tx);
     const c = await pii.protectCnic(cnic);
     const p = await pii.protectPhone(phone);
@@ -55,7 +55,7 @@ const register = (tenantId: string, name: string, cnic: string, phone: string) =
   });
 
 const findByCnic = (tenantId: string, cnic: string) =>
-  withTenant(app.db, { tenantId }, async (tx) => {
+  withTenant(app.db, { tenantId, branchId: 'all' }, async (tx) => {
     const pii = await keyring.forTenant(tx);
     return tx
       .select({ name: patients.name })
@@ -93,7 +93,7 @@ describe('PII at rest', () => {
   });
 
   it('decrypts back to the normalised value for the owning tenant', async () => {
-    const values = await withTenant(app.db, { tenantId: A }, async (tx) => {
+    const values = await withTenant(app.db, { tenantId: A, branchId: 'all' }, async (tx) => {
       const pii = await keyring.forTenant(tx);
       const [row] = await tx.select().from(patients);
       if (!row?.cnicEnc || !row.phoneEnc) throw new Error('fixture missing');
@@ -104,7 +104,7 @@ describe('PII at rest', () => {
 
   it('finds a patient by exact CNIC or phone, whatever the spelling', async () => {
     expect(await findByCnic(A, '3520212345671')).toEqual([{ name: 'Ayesha' }]);
-    const byPhone = await withTenant(app.db, { tenantId: A }, async (tx) => {
+    const byPhone = await withTenant(app.db, { tenantId: A, branchId: 'all' }, async (tx) => {
       const pii = await keyring.forTenant(tx);
       return tx
         .select({ name: patients.name })
@@ -131,7 +131,7 @@ describe('PII at rest', () => {
     if (!stolen) throw new Error('fixture missing');
 
     await expect(
-      withTenant(app.db, { tenantId: A }, async (tx) =>
+      withTenant(app.db, { tenantId: A, branchId: 'all' }, async (tx) =>
         (await keyring.forTenant(tx)).decrypt('cnic', stolen),
       ),
     ).rejects.toBeInstanceOf(DecryptionError);
@@ -145,7 +145,7 @@ describe('PII at rest', () => {
 describe('data key rotation', () => {
   it('encrypts new values with the new key while old values still decrypt', async () => {
     const tenantId = randomUUID();
-    const result = await withTenant(app.db, { tenantId }, async (tx) => {
+    const result = await withTenant(app.db, { tenantId, branchId: 'all' }, async (tx) => {
       const before = await (await keyring.forTenant(tx)).encrypt('cnic', 'old');
       const version = await keyring.rotateDataKey(tx);
       const pii = await keyring.forTenant(tx);

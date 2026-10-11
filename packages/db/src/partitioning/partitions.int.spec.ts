@@ -98,7 +98,7 @@ describe('ensureMonthlyPartitions', () => {
 
   it('uses UTC month bounds: the last instant of a month and the first of the next split', async () => {
     const tenantId = randomUUID();
-    await withTenant(app.db, { tenantId }, (tx) =>
+    await withTenant(app.db, { tenantId, branchId: 'all' }, (tx) =>
       tx.insert(vitals).values([
         { recordedAt: new Date('2026-11-30T23:59:59.999Z'), pulse: '72' },
         { recordedAt: new Date('2026-12-01T00:00:00Z'), pulse: '80' },
@@ -112,7 +112,7 @@ describe('ensureMonthlyPartitions', () => {
 
   it('rejects rows for a month with no partition (why partitions are created ahead)', async () => {
     const error = await pgErrorOf(
-      withTenant(app.db, { tenantId: randomUUID() }, (tx) =>
+      withTenant(app.db, { tenantId: randomUUID(), branchId: 'all' }, (tx) =>
         tx.insert(vitals).values({ recordedAt: new Date('2030-01-01T00:00:00Z'), pulse: '1' }),
       ),
     );
@@ -192,13 +192,19 @@ describe('row-level security on partitioned tables', () => {
 
   it('returns nothing when a partition is queried directly, even for its own tenant', async () => {
     const tenantId = randomUUID();
-    const [viaParent, direct] = await withTenant(app.db, { tenantId }, async (tx) => {
-      await tx.insert(vitals).values({ recordedAt: new Date('2027-01-05T00:00:00Z'), pulse: '1' });
-      return [
-        await tx.execute(sql`select 1 from vitals where tenant_id = ${tenantId}`),
-        await tx.execute(sql`select 1 from vitals_p202701`),
-      ];
-    });
+    const [viaParent, direct] = await withTenant(
+      app.db,
+      { tenantId, branchId: 'all' },
+      async (tx) => {
+        await tx
+          .insert(vitals)
+          .values({ recordedAt: new Date('2027-01-05T00:00:00Z'), pulse: '1' });
+        return [
+          await tx.execute(sql`select 1 from vitals where tenant_id = ${tenantId}`),
+          await tx.execute(sql`select 1 from vitals_p202701`),
+        ];
+      },
+    );
     expect(viaParent.rowCount).toBe(1);
     expect(direct.rowCount).toBe(0);
   });

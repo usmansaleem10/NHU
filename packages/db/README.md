@@ -87,7 +87,7 @@ Every table with a `tenant_id` is isolated by Postgres RLS. The app role `hims_a
 ```ts
 import { withTenant } from '@hims/db';
 
-const beds = await withTenant(db, { tenantId, branchId, userId }, (tx) =>
+const beds = await withTenant(db, { tenantId, branchId /* uuid | 'all' */, userId }, (tx) =>
   tx.select().from(wardBeds),
 );
 ```
@@ -97,7 +97,10 @@ const beds = await withTenant(db, { tenantId, branchId, userId }, (tx) =>
   transaction pooling hands the server connection to another client after `COMMIT` and never runs
   `server_reset_query`, so a session-level `SET` would leak one tenant's context to the next.
 - `tenantId` comes from the resolved hostname + session, never from the request (AGENTS.md rule 1).
-- `branchId` omitted = tenant-wide (all branches); set = confined to that branch on branch-scoped tables.
+- `branchId` is required: a branch UUID confines branch-scoped tables to that branch; `'all'`
+  (`ALL_BRANCHES`) is explicit tenant-wide access. Forgetting it throws instead of widening access.
+- Nesting (`withTenant(tx, ...)`) with the same context is fine; with a different one it throws
+  `TenantContextConflictError` (a `set_config` inside a savepoint would survive `RELEASE`).
 - No context = no rows, and every write fails the policy.
 - Malformed ids throw `InvalidTenantContextError` before any query runs.
 
@@ -117,9 +120,10 @@ const beds = await withTenant(db, { tenantId, branchId, userId }, (tx) =>
 ### Guard (CI + deploy)
 
 `assertTenantTablesHaveRls(db)` fails if any table or partition with a `tenant_id` column lacks
-RLS enabled, forced, or (for non-partitions) a policy. It runs:
+RLS enabled or forced, or (for non-partitions) a permissive `tenant_isolation` policy for ALL
+commands with both `USING` and `WITH CHECK`. It runs:
 
-- at the end of every `runMigrations()` / `db:migrate`, so a bad migration fails the deploy;
+- inside the `runMigrations()` / `db:migrate` transaction, so a bad migration rolls back;
 - in `src/tenancy/rls.int.spec.ts` against all real migrations, so CI fails first.
 
 ## Time partitioning (high-volume tables)

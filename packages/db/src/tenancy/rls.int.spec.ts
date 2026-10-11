@@ -14,7 +14,7 @@ import {
   type TestDatabase,
 } from '../testing/postgres.js';
 import { assertTenantTablesHaveRls, findTenantTablesWithoutRls, tenantRlsSql } from './rls.js';
-import { withTenant } from './with-tenant.js';
+import { type TenantContext, TenantContextConflictError, withTenant } from './with-tenant.js';
 
 const notes = pgTable('notes', { ...tenantColumns(), body: text('body').notNull() });
 const beds = pgTable('beds', { ...branchColumns(), label: text('label').notNull() });
@@ -37,10 +37,12 @@ beforeAll(async () => {
   app = createDatabase({ connectionString: pgc.appUrl });
   single = createDatabase({ connectionString: pgc.appUrl, max: 1 });
 
-  await withTenant(app.db, { tenantId: A }, (tx) =>
+  await withTenant(app.db, { tenantId: A, branchId: 'all' }, (tx) =>
     tx.insert(notes).values([{ body: 'a-1' }, { body: 'a-2' }]),
   );
-  await withTenant(app.db, { tenantId: B }, (tx) => tx.insert(notes).values({ body: 'b-1' }));
+  await withTenant(app.db, { tenantId: B, branchId: 'all' }, (tx) =>
+    tx.insert(notes).values({ body: 'b-1' }),
+  );
   await withTenant(app.db, { tenantId: A, branchId: A1 }, (tx) =>
     tx.insert(beds).values({ label: 'A1-bed' }),
   );
@@ -56,7 +58,7 @@ afterAll(async () => {
 });
 
 const notesOf = (tenantId: string) =>
-  withTenant(app.db, { tenantId }, (tx) => tx.select().from(notes));
+  withTenant(app.db, { tenantId, branchId: 'all' }, (tx) => tx.select().from(notes));
 
 describe('tenant isolation (RLS)', () => {
   it('returns no rows when no tenant context is set', async () => {
@@ -64,7 +66,9 @@ describe('tenant isolation (RLS)', () => {
   });
 
   it('does not leak the context to the next transaction on the same connection', async () => {
-    const inside = await withTenant(single.db, { tenantId: A }, (tx) => tx.select().from(notes));
+    const inside = await withTenant(single.db, { tenantId: A, branchId: 'all' }, (tx) =>
+      tx.select().from(notes),
+    );
     const after = await single.db.select().from(notes);
 
     expect(inside).toHaveLength(2);
@@ -78,7 +82,7 @@ describe('tenant isolation (RLS)', () => {
 
   it('rejects inserting a row for another tenant (WITH CHECK)', async () => {
     const error = await pgErrorOf(
-      withTenant(app.db, { tenantId: A }, (tx) =>
+      withTenant(app.db, { tenantId: A, branchId: 'all' }, (tx) =>
         tx.insert(notes).values({ tenantId: B, body: 'smuggled' }),
       ),
     );
@@ -87,7 +91,7 @@ describe('tenant isolation (RLS)', () => {
 
   it('rejects moving an own row to another tenant', async () => {
     const error = await pgErrorOf(
-      withTenant(app.db, { tenantId: A }, (tx) =>
+      withTenant(app.db, { tenantId: A, branchId: 'all' }, (tx) =>
         tx.update(notes).set({ tenantId: B }).where(eq(notes.body, 'a-1')),
       ),
     );
@@ -98,7 +102,7 @@ describe('tenant isolation (RLS)', () => {
     const [bNote] = await notesOf(B);
     if (!bNote) throw new Error('fixture missing');
 
-    const touched = await withTenant(app.db, { tenantId: A }, async (tx) => {
+    const touched = await withTenant(app.db, { tenantId: A, branchId: 'all' }, async (tx) => {
       const updated = await tx
         .update(notes)
         .set({ body: 'hijacked' })
@@ -128,17 +132,49 @@ describe('tenant isolation (RLS)', () => {
   });
 });
 
+describe('withTenant nesting', () => {
+  it('refuses a nested context for another tenant instead of leaking it into the outer one', async () => {
+    const outer = withTenant(app.db, { tenantId: A, branchId: 'all' }, async (tx) => {
+      await withTenant(tx, { tenantId: B, branchId: 'all' }, (inner) => inner.select().from(notes));
+      return tx.select({ body: notes.body }).from(notes); // must never see B's rows
+    });
+    await expect(outer).rejects.toBeInstanceOf(TenantContextConflictError);
+  });
+
+  it('allows nesting with the same context', async () => {
+    const rows = await withTenant(app.db, { tenantId: A, branchId: 'all' }, (tx) =>
+      withTenant(tx, { tenantId: A, branchId: 'all' }, (inner) => inner.select().from(notes)),
+    );
+    expect(rows).toHaveLength(2);
+  });
+});
+
+describe('FORCE ROW LEVEL SECURITY', () => {
+  it('binds the table owner (hims_owner) too', async () => {
+    const owner = createDatabase({ connectionString: pgc.ownerUrl });
+    try {
+      expect(await owner.db.select().from(notes)).toEqual([]);
+      const own = await withTenant(owner.db, { tenantId: B, branchId: 'all' }, (tx) =>
+        tx.select({ body: notes.body }).from(notes),
+      );
+      expect(own).toEqual([{ body: 'b-1' }]);
+    } finally {
+      await owner.close();
+    }
+  });
+});
+
 describe('branch-scoped tables', () => {
-  const bedsIn = (context: { tenantId: string; branchId?: string }) =>
+  const bedsIn = (context: TenantContext) =>
     withTenant(app.db, context, (tx) => tx.select({ label: beds.label }).from(beds));
 
   it('confine a branch context to its branch, while tenant-wide context sees all branches', async () => {
     expect(await bedsIn({ tenantId: A, branchId: A1 })).toEqual([{ label: 'A1-bed' }]);
-    expect((await bedsIn({ tenantId: A })).map((b) => b.label).sort()).toEqual([
+    expect((await bedsIn({ tenantId: A, branchId: 'all' })).map((b) => b.label).sort()).toEqual([
       'A1-bed',
       'A2-bed',
     ]);
-    expect(await bedsIn({ tenantId: B })).toEqual([]);
+    expect(await bedsIn({ tenantId: B, branchId: 'all' })).toEqual([]);
   });
 
   it('reject writing into another branch from a branch context', async () => {
@@ -161,22 +197,42 @@ describe('tenant RLS guard', () => {
     }
   });
 
-  it('flags a tenant table that forgot RLS, forgot FORCE, or has no policy', async () => {
+  it('flags missing RLS, missing FORCE, and policies that are not a full tenant_isolation', async () => {
+    const forced = (t: string) => [
+      `create table ${t} (id uuid primary key, tenant_id uuid not null)`,
+      `alter table ${t} enable row level security`,
+      `alter table ${t} force row level security`,
+    ];
+    const predicate = 'tenant_id = (select app_current_tenant_id())';
     await execAsOwner(pgc.ownerUrl, [
       'create table forgot_rls (id uuid primary key, tenant_id uuid not null)',
       'create table forgot_force (id uuid primary key, tenant_id uuid not null)',
       'alter table forgot_force enable row level security',
       'create table no_tenant (id uuid primary key)',
+      ...forced('wrong_name'),
+      `create policy sloppy on wrong_name using (${predicate}) with check (${predicate})`,
+      ...forced('select_only'),
+      `create policy tenant_isolation on select_only for select using (${predicate})`,
+      ...forced('no_check'),
+      `create policy tenant_isolation on no_check using (${predicate})`,
     ]);
-    const owner = createDatabase({ connectionString: pgc.ownerUrl });
+    const owner = createDatabase({ connectionString: pgc.superUrl });
     try {
       expect(await findTenantTablesWithoutRls(owner.db)).toEqual([
-        { table: 'public.forgot_force', problems: ['rls_not_forced', 'no_policy'] },
-        { table: 'public.forgot_rls', problems: ['rls_disabled', 'rls_not_forced', 'no_policy'] },
+        { table: 'public.forgot_force', problems: ['rls_not_forced', 'no_tenant_policy'] },
+        {
+          table: 'public.forgot_rls',
+          problems: ['rls_disabled', 'rls_not_forced', 'no_tenant_policy'],
+        },
+        { table: 'public.no_check', problems: ['no_tenant_policy'] },
+        { table: 'public.select_only', problems: ['no_tenant_policy'] },
+        { table: 'public.wrong_name', problems: ['no_tenant_policy'] },
       ]);
     } finally {
       await owner.close();
-      await execAsOwner(pgc.ownerUrl, ['drop table forgot_rls, forgot_force, no_tenant']);
+      await execAsOwner(pgc.ownerUrl, [
+        'drop table forgot_rls, forgot_force, no_tenant, wrong_name, select_only, no_check',
+      ]);
     }
   });
 });

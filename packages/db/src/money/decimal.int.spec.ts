@@ -51,7 +51,7 @@ describe('money and quantity columns against Postgres', () => {
 
   it('round-trips exact values and sums them exactly in SQL', async () => {
     const tenantId = randomUUID();
-    const { row, total } = await withTenant(app.db, { tenantId }, async (tx) => {
+    const { row, total } = await withTenant(app.db, { tenantId, branchId: 'all' }, async (tx) => {
       await tx.insert(invoiceLines).values(
         ['0.1', '0.2', '999999999.99'].map((price) => ({
           item: `item ${price}`,
