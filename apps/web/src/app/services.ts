@@ -1,32 +1,25 @@
 /**
- * The single wiring point between screens and their data sources. Every entry is an interface;
- * today the implementations are DEV FIXTURES (src/dev-fixtures). When F0-API's typed contracts
- * client lands, swap each fixture for the API-backed implementation here — screens don't change.
+ * The single wiring point between screens and their data sources. Every entry is an interface.
+ * Production builds use the API-backed implementations (app/api/api-services.ts). Dev server and
+ * E2E builds (VITE_DEV_FIXTURES=true) load in-memory DEV FIXTURES through a dynamic import that
+ * Rollup drops from production bundles. Screens never know which one they got.
  */
-import {
-  createStorageSavedViewsStore,
-  type FetchPage,
-  type PatientSearchQuery,
-  type PatientSearchResult,
-  type SavedViewsStore,
-  type TypeaheadSearch,
+import type {
+  FetchPage,
+  PatientSearchQuery,
+  PatientSearchResult,
+  SavedViewsStore,
+  TypeaheadSearch,
 } from '@hims/ui';
 
-import {
-  searchDepartments,
-  submitDemoRegistration,
-  type DemoRegistration,
-} from '../dev-fixtures/demo-form';
-import { createDemoPatientSource, type DemoPatient } from '../dev-fixtures/demo-patients';
-import { createDevMasterSources } from '../dev-fixtures/masters';
-import { createPatientSearch } from '../dev-fixtures/patient-search';
+import type { DemoPatient, DemoRegistration } from '../features/foundation';
 import type { MasterDataSource } from '../features/masters';
-import { createDevSessionSource } from '../dev-fixtures/session';
+import { createApiServices } from './api/api-services';
 import type { SessionSource } from './session/types';
 
 export interface AppServices {
   session: SessionSource;
-  /** List endpoint for the data-table reference screen (GET /api/v1/patients?page&size&sort&q&f.*). */
+  /** Patient list for the data-table reference screen (POST /api/v1/patients/query). */
   demoPatients: FetchPage<DemoPatient>;
   /** Per-user saved table views. Browser storage now; a user-preferences endpoint later. */
   savedViews: SavedViewsStore;
@@ -47,7 +40,7 @@ function browserStorage(): Storage {
   try {
     return window.localStorage;
   } catch {
-    // Storage blocked (private mode policies): keep views for this page only.
+    // Storage blocked (private mode policies): keep data for this page only.
     const data = new Map<string, string>();
     return {
       get length() {
@@ -68,12 +61,19 @@ function browserStorage(): Storage {
   }
 }
 
-export const services: AppServices = {
-  session: createDevSessionSource(),
-  demoPatients: createDemoPatientSource(),
-  savedViews: createStorageSavedViewsStore(browserStorage()),
-  searchDepartments,
-  submitDemoRegistration,
-  masters: createDevMasterSources(),
-  searchPatients: createPatientSearch(),
-};
+/**
+ * Filled by initServices() before the first render (main.tsx). Kept as one stable object so call
+ * sites read `services.demoPatients(...)` without awaiting anything.
+ */
+export const services = {} as AppServices;
+
+export async function initServices(): Promise<void> {
+  // Both flags are statically replaced at build time, so in a production build this branch is
+  // dead code and the dev-fixtures chunk is never emitted (checked by check-no-dev-fixtures).
+  if (import.meta.env.DEV || import.meta.env.VITE_DEV_FIXTURES === 'true') {
+    const { createDevServices } = await import('../dev-fixtures');
+    Object.assign(services, createDevServices(browserStorage()));
+  } else {
+    Object.assign(services, createApiServices(browserStorage()));
+  }
+}

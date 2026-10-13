@@ -67,32 +67,53 @@ const PERSONAS: Record<string, Omit<Session, 'activeBranchId'>> = {
   },
 };
 
-function personaName(): string {
+const DEFAULT_PERSONA = 'nurse'; // least privileged: forgetting to pick one never grants admin
+
+function storedPersona(): string | null {
   try {
-    return localStorage.getItem('hims.dev.persona') ?? 'admin';
+    return localStorage.getItem('hims.dev.persona');
   } catch {
-    return 'admin';
+    return null;
   }
 }
 
+/** Fails closed: an unknown persona is an error, never a silent fallback to admin. */
+export function resolvePersona(name: string | null): Omit<Session, 'activeBranchId'> {
+  const key = name ?? DEFAULT_PERSONA;
+  const persona = Object.hasOwn(PERSONAS, key) ? PERSONAS[key] : undefined;
+  if (!persona) throw new Error(`Unknown dev persona "${key}"`);
+  return persona;
+}
+
 export function createDevSessionSource(latencyMs = 120): SessionSource {
-  const base = PERSONAS[personaName()] ?? PERSONAS.admin;
-  if (!base) throw new Error('admin persona missing');
-  let session: Session = { ...base, activeBranchId: base.branches[0]?.id ?? '' };
-  const delay = <T>(value: T) =>
-    new Promise<T>((resolve) => {
+  let session: Session | null = null;
+  // Resolved on first load so a bad persona surfaces as the session error screen.
+  const current = (): Session => {
+    if (!session) {
+      const base = resolvePersona(storedPersona());
+      session = { ...base, activeBranchId: base.branches[0]?.id ?? '' };
+    }
+    return session;
+  };
+  const delay = <T>(value: () => T) =>
+    new Promise<T>((resolve, reject) => {
       setTimeout(() => {
-        resolve(value);
+        try {
+          resolve(value());
+        } catch (e) {
+          reject(e instanceof Error ? e : new Error(String(e)));
+        }
       }, latencyMs);
     });
   return {
-    load: () => delay(session),
-    switchBranch: (branchId) => {
-      if (!session.branches.some((b) => b.id === branchId)) {
-        return Promise.reject(new Error(`Unknown branch ${branchId}`));
-      }
-      session = { ...session, activeBranchId: branchId };
-      return delay(session);
-    },
+    load: () => delay(current),
+    switchBranch: (branchId) =>
+      delay(() => {
+        const s = current();
+        if (!s.branches.some((b) => b.id === branchId))
+          throw new Error(`Unknown branch ${branchId}`);
+        session = { ...s, activeBranchId: branchId };
+        return session;
+      }),
   };
 }

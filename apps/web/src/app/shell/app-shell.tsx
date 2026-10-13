@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { formatLocaleFor, isLanguage } from '../i18n/i18n';
 import { canAccess } from '../navigation/access';
-import { useSession } from '../session/session-provider';
+import { BranchScope, useSession } from '../session/session-provider';
 import { BranchSwitcher, LanguageSwitcher, UserMenu } from './header-menus';
 import { SidebarNav } from './sidebar-nav';
 
@@ -123,7 +123,9 @@ function ShellLayout() {
         </header>
 
         <main id="main" ref={mainRef} tabIndex={-1} className="flex-1 p-4 outline-none md:p-6">
-          <GuardedOutlet />
+          <BranchScope>
+            <GuardedOutlet />
+          </BranchScope>
         </main>
       </div>
     </div>

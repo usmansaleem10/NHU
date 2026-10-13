@@ -5,6 +5,8 @@
  */
 import { ProblemError, type TypeaheadOption, type TypeaheadSearch } from '@hims/ui';
 
+import type { DemoRegistration } from '../features/foundation';
+
 const DEPARTMENTS: TypeaheadOption[] = Array.from({ length: 300 }, (_, i) => {
   const n = String(i + 1).padStart(3, '0');
   return {
@@ -41,12 +43,6 @@ export const searchDepartments: TypeaheadSearch = (query, { signal, limit }) =>
     200,
     signal,
   );
-
-export interface DemoRegistration {
-  fullName: string;
-  email: string;
-  departmentId: string;
-}
 
 /**
  * POST /api/v1/demo-registrations. Rejects like the real API will:

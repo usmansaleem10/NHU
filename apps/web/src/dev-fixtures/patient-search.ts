@@ -6,7 +6,8 @@
  */
 import type { PatientSearchQuery, PatientSearchResult } from '@hims/ui';
 
-import { createDemoPatientSource, DEMO_PATIENT_COUNT, type DemoPatient } from './demo-patients';
+import type { DemoPatient } from '../features/foundation';
+import { createDemoPatientSource, DEMO_PATIENT_COUNT } from './demo-patients';
 
 const pad = (n: number, width: number) => String(n).padStart(width, '0');
 

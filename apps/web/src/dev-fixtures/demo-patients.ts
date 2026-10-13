@@ -6,20 +6,9 @@
  */
 import type { DataPage, TableQuery } from '@hims/ui';
 
-export interface DemoPatient {
-  id: string;
-  mrn: string;
-  name: string;
-  gender: 'female' | 'male';
-  ward: string;
-  /** ISO instant (UTC). */
-  admittedAt: string;
-  status: 'admitted' | 'discharged' | 'transferred';
-  /** Money as a decimal string (AGENTS.md rule 9). */
-  balance: string;
-}
+import { DEMO_WARDS, type DemoPatient } from '../features/foundation';
 
-const WARDS = ['Ward A', 'Ward B', 'Ward C', 'ICU', 'CCU', 'Maternity'];
+const WARDS = DEMO_WARDS;
 const STATUSES: DemoPatient['status'][] = [
   'admitted',
   'admitted',
@@ -63,7 +52,6 @@ function generate(count: number): DemoPatient[] {
 let rows: DemoPatient[] | undefined;
 
 export const DEMO_PATIENT_COUNT = 10_000;
-export const DEMO_WARDS = WARDS;
 
 function compare(a: DemoPatient, b: DemoPatient, id: string): number {
   if (id === 'balance') return Number(a.balance) - Number(b.balance);

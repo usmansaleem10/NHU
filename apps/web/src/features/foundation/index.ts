@@ -6,6 +6,8 @@ import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from '../../app/routes/root';
 import { validateTableSearch } from './routes/data-table.search';
 
+export { DEMO_WARDS, type DemoPatient, type DemoRegistration } from './model';
+
 export const dataTableRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/foundation/data-table',

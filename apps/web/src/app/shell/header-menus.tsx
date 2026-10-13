@@ -19,37 +19,44 @@ import { useColorScheme } from '../theme';
 
 export function BranchSwitcher() {
   const { t } = useTranslation();
-  const { session, switchBranch, switchingBranch } = useSession();
+  const { session, switchBranch, switchingBranch, switchBranchFailed } = useSession();
   const active = session.branches.find((b) => b.id === session.activeBranchId);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="max-w-56"
-          aria-label={t('shell.branchSwitcher', { branch: active?.name ?? '' })}
-          disabled={switchingBranch}
-        >
-          <Building2 aria-hidden />
-          <span className="truncate" data-testid="active-branch">
-            {active?.name}
-          </span>
-          <ChevronDown className="opacity-60" aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>{t('shell.branch')}</DropdownMenuLabel>
-        <DropdownMenuRadioGroup value={session.activeBranchId} onValueChange={switchBranch}>
-          {session.branches.map((b) => (
-            <DropdownMenuRadioItem key={b.id} value={b.id}>
-              {b.name}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="max-w-56"
+            aria-label={t('shell.branchSwitcher', { branch: active?.name ?? '' })}
+            disabled={switchingBranch}
+          >
+            <Building2 aria-hidden />
+            <span className="truncate" data-testid="active-branch">
+              {active?.name}
+            </span>
+            <ChevronDown className="opacity-60" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>{t('shell.branch')}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={session.activeBranchId} onValueChange={switchBranch}>
+            {session.branches.map((b) => (
+              <DropdownMenuRadioItem key={b.id} value={b.id}>
+                {b.name}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {switchBranchFailed ? (
+        <span role="alert" className="text-xs text-destructive">
+          {t('shell.branchSwitchFailed')}
+        </span>
+      ) : null}
+    </>
   );
 }
 

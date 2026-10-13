@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, Fragment, useContext, useMemo, type ReactNode } from 'react';
 
 import { accessFromSession, type Access } from '../navigation/access';
 import type { Session, SessionSource } from './types';
@@ -9,6 +9,8 @@ interface SessionContextValue {
   access: Access;
   switchBranch: (branchId: string) => void;
   switchingBranch: boolean;
+  /** The last branch switch failed; the user is still on the previous branch. */
+  switchBranchFailed: boolean;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -36,14 +38,20 @@ export function SessionProvider({
   const branchMutation = useMutation({
     mutationFn: (branchId: string) => source.switchBranch(branchId),
     onSuccess: async (session) => {
+      // Everything except the session is branch-scoped. Drop it BEFORE the new branch becomes
+      // active so no screen can render the old branch's rows (keepPreviousData included);
+      // <BranchScope> remounts the screens, which then fetch for the new branch.
+      const notSession = {
+        predicate: (q: { queryKey: readonly unknown[] }) => q.queryKey[0] !== SESSION_KEY[0],
+      };
+      await queryClient.cancelQueries(notSession);
+      queryClient.removeQueries(notSession);
       queryClient.setQueryData(SESSION_KEY, session);
-      // Everything else is branch-scoped data: refetch it for the new branch.
-      await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== SESSION_KEY[0] });
     },
   });
 
   const { data } = query;
-  const { mutate, isPending } = branchMutation;
+  const { mutate, isPending, isError } = branchMutation;
   const value = useMemo<SessionContextValue | null>(
     () =>
       data
@@ -54,9 +62,10 @@ export function SessionProvider({
               mutate(id);
             },
             switchingBranch: isPending,
+            switchBranchFailed: isError,
           }
         : null,
-    [data, mutate, isPending],
+    [data, mutate, isPending, isError],
   );
 
   let state: SessionState;
@@ -71,6 +80,12 @@ export function SessionProvider({
   else state = { status: 'pending' };
 
   return <SessionContext value={value}>{children(state)}</SessionContext>;
+}
+
+/** Remounts its subtree when the active branch changes (fresh component and query state). */
+export function BranchScope({ children }: { children: ReactNode }) {
+  const { session } = useSession();
+  return <Fragment key={session.activeBranchId}>{children}</Fragment>;
 }
 
 export function useSession(): SessionContextValue {

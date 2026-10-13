@@ -17,6 +17,7 @@ export const en = {
   'shell.navLabel': 'Main navigation',
   'shell.openNav': 'Open navigation',
   'shell.branch': 'Branch',
+  'shell.branchSwitchFailed': 'Could not change branch. You are still working in the previous one.',
   'shell.branchSwitcher': 'Branch: {{branch}}. Change branch',
   'shell.userMenu': 'Account menu',
   'shell.theme': 'Theme',

@@ -23,7 +23,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { services } from '../../../app/services';
-import { DEMO_WARDS, type DemoPatient } from '../../../dev-fixtures/demo-patients';
+import { DEMO_WARDS, type DemoPatient } from '../model';
 import { PATIENT_TABLE_DEFAULTS, queryFromSearch, type TableMode } from './data-table.search';
 
 export const Route = createLazyRoute('/foundation/data-table')({ component: DataTableScreen });
