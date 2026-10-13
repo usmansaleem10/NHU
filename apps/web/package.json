@@ -6,12 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5173 --strictPort",
-    "build": "tsc -p tsconfig.build.json && vite build && node scripts/check-bundle-size.mjs dist && node scripts/check-no-dev-fixtures.mjs dist",
+    "build": "tsc -p tsconfig.build.json && vite build && node scripts/check-bundle-size.mjs dist && node scripts/check-no-dev-fixtures.mjs dist && node scripts/extract-sourcemaps.mjs dist dist-sourcemaps",
     "build:e2e": "tsc -p tsconfig.build.json && VITE_DEV_FIXTURES=true vite build --outDir dist/e2e && node scripts/check-bundle-size.mjs dist/e2e",
     "preview": "vite preview --port 4173 --strictPort",
     "preview:e2e": "vite preview --outDir dist/e2e --port 4173 --strictPort",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist .turbo",
+    "clean": "rm -rf dist dist-sourcemaps .turbo",
     "lint": "eslint . --max-warnings=0 && node node_modules/@hims/ui/scripts/check-css-colours.mjs src",
     "test": "vitest run --project unit --coverage",
     "test:int": "vitest run --project integration"
