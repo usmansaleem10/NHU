@@ -1,3 +1,4 @@
+import { CSS_NAMED_COLOURS } from './named-colours.js';
 import { COLOR_TOKENS, type TenantTheme, type ThemeTokenValues } from './tokens.js';
 
 const COLOR_SET: ReadonlySet<string> = new Set(COLOR_TOKENS);
@@ -8,7 +9,6 @@ const COLOR_SET: ReadonlySet<string> = new Set(COLOR_TOKENS);
  * fetch remote resources, or escape the declaration).
  */
 const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-const NAMED = /^[a-z]{3,30}$/i;
 const COLOR_FUNCTIONS: ReadonlySet<string> = new Set([
   'rgb',
   'rgba',
@@ -37,17 +37,32 @@ function balanced(value: string): boolean {
   return depth === 0;
 }
 
-function isSafeColor(value: string): boolean {
-  if (HEX.test(value) || NAMED.test(value)) return true;
+type CssSupports = (property: string, value: string) => boolean;
+
+function engineSupports(): CssSupports | null {
+  const css = (globalThis as { CSS?: { supports?: CssSupports } }).CSS;
+  return css?.supports ? css.supports.bind(css) : null;
+}
+
+function isSafeColor(token: string, value: string): boolean {
+  if (HEX.test(value)) return true;
+  const supports = engineSupports();
+  // Named colours: the real list (CSS-wide keywords like inherit/unset and currentcolor are not
+  // in it, and CSS.supports would accept them), confirmed by the engine when there is one.
+  if (/^[a-z]+$/i.test(value)) {
+    return CSS_NAMED_COLOURS.has(value.toLowerCase()) && (supports?.('color', value) ?? true);
+  }
   if (!COLOR_CHARS.test(value) || !balanced(value) || value.includes('/*')) return false;
   if (!/^[a-z-]+\(.*\)$/i.test(value)) return false;
   // Every function used, at any depth, must be a colour function (no url(), image-set(), ...).
   for (const match of value.matchAll(/([a-z-]+)\s*\(/gi)) {
     if (!COLOR_FUNCTIONS.has((match[1] ?? '').toLowerCase())) return false;
   }
-  // In a browser also ask the engine; tests and SSR rely on the grammar above.
-  const css = (globalThis as { CSS?: { supports?: (p: string, v: string) => boolean } }).CSS;
-  if (css?.supports && !value.startsWith('var(')) return css.supports('color', value);
+  // A token referring to itself is invalid at computed-value time (and wipes the default).
+  for (const match of value.matchAll(/var\(\s*--([\w-]+)/gi)) {
+    if (match[1] === token) return false;
+  }
+  if (supports && !value.includes('var(')) return supports('color', value);
   return true;
 }
 
@@ -58,7 +73,7 @@ function isSafeFontList(value: string): boolean {
 /** Validates one tenant token value against the grammar for that token's type. */
 export function isSafeTokenValue(token: string, value: string): boolean {
   const v = value.trim();
-  if (COLOR_SET.has(token)) return isSafeColor(v);
+  if (COLOR_SET.has(token)) return isSafeColor(token, v);
   if (token === 'radius') return LENGTH.test(v);
   if (token === 'font-sans') return isSafeFontList(v);
   return false; // unknown token

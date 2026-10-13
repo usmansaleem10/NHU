@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { buildThemeCss, isSafeTokenValue } from './theme-css.js';
 
@@ -57,8 +57,29 @@ describe('isSafeTokenValue', () => {
     ['font-sans', 'url(x), sans-serif', 'font with parentheses'],
     ['font-sans', 'Inter\\, x', 'font with backslash'],
     ['font-sans', '"Inter', 'unbalanced font quote'],
+    ['primary', 'notacolor', 'unknown named colour'],
+    ['primary', 'banana', 'unknown named colour'],
+    ['primary', 'inherit', 'CSS-wide keyword'],
+    ['primary', 'initial', 'CSS-wide keyword'],
+    ['primary', 'unset', 'CSS-wide keyword'],
+    ['primary', 'revert', 'CSS-wide keyword'],
+    ['primary', 'revert-layer', 'CSS-wide keyword'],
+    ['primary', 'currentColor', 'currentcolor (depends on context, not a brand colour)'],
+    ['primary', 'var(--primary)', 'self-reference (invalid at computed time)'],
+    ['primary', 'color-mix(in oklch, var(--primary) 80%, white)', 'nested self-reference'],
   ] as const)('rejects %s = %j (%s)', (token, value, why) => {
     expect(isSafeTokenValue(token, value), why).toBe(false);
     expect(buildThemeCss({ light: { [token]: value } })).toBe('');
+  });
+
+  it('defers to the browser engine for named colours when CSS.supports exists', () => {
+    const supports = vi.fn<(p: string, v: string) => boolean>(() => false);
+    vi.stubGlobal('CSS', { supports });
+    try {
+      expect(isSafeTokenValue('primary', 'teal')).toBe(false);
+      expect(supports).toHaveBeenCalledWith('color', 'teal');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
