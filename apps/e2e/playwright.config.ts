@@ -49,7 +49,8 @@ export default defineConfig({
   ],
   webServer: {
     // Dependencies' normal build, then the web app's E2E variant (production build + dev fixtures,
-    // written to apps/web/dist/e2e so the shippable dist never contains fixtures).
+    // written to apps/web/dist-e2e, outside the deployable dist; build:e2e also self-tests that
+    // the production fixture guard still detects fixtures).
     command:
       'pnpm --filter "@hims/web^..." build && pnpm --filter @hims/web build:e2e && pnpm --filter @hims/web preview:e2e',
     cwd: repoRoot,

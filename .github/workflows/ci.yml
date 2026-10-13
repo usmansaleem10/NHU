@@ -167,7 +167,8 @@ jobs:
         run: pnpm --filter @hims/e2e exec playwright install --with-deps chromium
 
       # The suite's webServer builds the web app's E2E variant (production build + dev fixtures in
-      # apps/web/dist/e2e) and serves it; the shippable dist never contains fixtures.
+      # apps/web/dist-e2e, outside the deployable dist) and serves it. build:e2e also self-tests that
+      # the fixture guard detects fixtures, so a dead marker fails this job.
       - name: Run E2E suites
         run: pnpm test:e2e
 
