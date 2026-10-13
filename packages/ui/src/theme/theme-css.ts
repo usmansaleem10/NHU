@@ -1,11 +1,68 @@
-import { COLOR_TOKENS, SHAPE_TOKENS, type TenantTheme, type ThemeTokenValues } from './tokens.js';
+import { COLOR_TOKENS, type TenantTheme, type ThemeTokenValues } from './tokens.js';
 
-const KNOWN_TOKENS: ReadonlySet<string> = new Set([...COLOR_TOKENS, ...SHAPE_TOKENS]);
+const COLOR_SET: ReadonlySet<string> = new Set(COLOR_TOKENS);
 
-// Tenant config arrives as JSON from the API, so values are untrusted: allow only characters a
-// colour, length or font list needs. No `;{}<>\` (breaking out of the declaration) and no url().
-const SAFE_VALUE = /^[\w\s#%.,()/'"+-]{1,200}$/;
-const FORBIDDEN_VALUE = /url\(|expression\(|\/\*/i;
+/*
+ * Tenant config arrives as JSON from the API, so every value is untrusted. Each token type has
+ * its own strict grammar; anything else is dropped (a bad tenant config must not break the app,
+ * fetch remote resources, or escape the declaration).
+ */
+const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const NAMED = /^[a-z]{3,30}$/i;
+const COLOR_FUNCTIONS: ReadonlySet<string> = new Set([
+  'rgb',
+  'rgba',
+  'hsl',
+  'hsla',
+  'hwb',
+  'lab',
+  'lch',
+  'oklab',
+  'oklch',
+  'color-mix',
+  'var',
+]);
+// No quotes, backslashes, ; { } < > — nothing that can end the declaration or the <style>.
+const COLOR_CHARS = /^[\w\s#%.,()/+-]{1,200}$/;
+const LENGTH = /^(?:0|\d{1,3}(?:\.\d{1,3})?(?:px|rem|em|%))$/;
+const FONT_FAMILY = /^(?:[a-z][\w -]{0,40}|'[\w -]{1,40}'|"[\w -]{1,40}")$/i;
+
+function balanced(value: string): boolean {
+  let depth = 0;
+  for (const ch of value) {
+    if (ch === '(') depth += 1;
+    else if (ch === ')') depth -= 1;
+    if (depth < 0) return false;
+  }
+  return depth === 0;
+}
+
+function isSafeColor(value: string): boolean {
+  if (HEX.test(value) || NAMED.test(value)) return true;
+  if (!COLOR_CHARS.test(value) || !balanced(value) || value.includes('/*')) return false;
+  if (!/^[a-z-]+\(.*\)$/i.test(value)) return false;
+  // Every function used, at any depth, must be a colour function (no url(), image-set(), ...).
+  for (const match of value.matchAll(/([a-z-]+)\s*\(/gi)) {
+    if (!COLOR_FUNCTIONS.has((match[1] ?? '').toLowerCase())) return false;
+  }
+  // In a browser also ask the engine; tests and SSR rely on the grammar above.
+  const css = (globalThis as { CSS?: { supports?: (p: string, v: string) => boolean } }).CSS;
+  if (css?.supports && !value.startsWith('var(')) return css.supports('color', value);
+  return true;
+}
+
+function isSafeFontList(value: string): boolean {
+  return value.length <= 200 && value.split(',').every((part) => FONT_FAMILY.test(part.trim()));
+}
+
+/** Validates one tenant token value against the grammar for that token's type. */
+export function isSafeTokenValue(token: string, value: string): boolean {
+  const v = value.trim();
+  if (COLOR_SET.has(token)) return isSafeColor(v);
+  if (token === 'radius') return LENGTH.test(v);
+  if (token === 'font-sans') return isSafeFontList(v);
+  return false; // unknown token
+}
 
 export const TENANT_THEME_STYLE_ID = 'hims-tenant-theme';
 
@@ -13,25 +70,24 @@ function declarations(values: ThemeTokenValues | undefined): string[] {
   if (!values) return [];
   const out: string[] = [];
   for (const [token, value] of Object.entries(values)) {
-    // Unknown keys and unsafe values are dropped: a bad tenant config must not break the app.
-    if (!KNOWN_TOKENS.has(token) || typeof value !== 'string') continue;
-    const trimmed = value.trim();
-    if (!SAFE_VALUE.test(trimmed) || FORBIDDEN_VALUE.test(trimmed)) continue;
-    out.push(`  --${token}: ${trimmed};`);
+    if (typeof value !== 'string' || !isSafeTokenValue(token, value)) continue;
+    out.push(`  --${token}: ${value.trim()};`);
   }
   return out;
 }
 
 /**
- * Builds the stylesheet that overrides the default tokens for one tenant. Light values go on
- * `:root`, dark values on `.dark`; anything not overridden keeps the built-in default.
+ * Builds the stylesheet that overrides the default tokens for one tenant. Light values apply
+ * only in light mode (`:root:not(.dark)`) and dark values only in dark mode (`:root.dark`), so a
+ * tenant that brands light mode never leaks its light colours into dark mode. Both selectors
+ * outrank the defaults in tokens.css; anything not overridden keeps the built-in value.
  */
 export function buildThemeCss(theme: TenantTheme): string {
   const blocks: string[] = [];
   const light = declarations(theme.light);
   const dark = declarations(theme.dark);
-  if (light.length > 0) blocks.push(`:root {\n${light.join('\n')}\n}`);
-  if (dark.length > 0) blocks.push(`.dark {\n${dark.join('\n')}\n}`);
+  if (light.length > 0) blocks.push(`:root:not(.dark) {\n${light.join('\n')}\n}`);
+  if (dark.length > 0) blocks.push(`:root.dark {\n${dark.join('\n')}\n}`);
   return blocks.join('\n');
 }
 

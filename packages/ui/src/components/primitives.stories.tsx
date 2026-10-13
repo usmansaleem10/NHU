@@ -40,7 +40,7 @@ export const TenantOverride: Story = () => {
         onClick={() => {
           const next = !on;
           setOn(next);
-          applyTenantTheme(next ? { light: { primary: 'teal', radius: '1rem' } } : {});
+          applyTenantTheme(next ? { light: { primary: 'var(--success)', radius: '1rem' } } : {});
         }}
       >
         Toggle demo tenant theme

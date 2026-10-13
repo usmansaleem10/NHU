@@ -61,6 +61,8 @@ const PERSONAS: Record<string, Omit<Session, 'activeBranchId'>> = {
       name: 'Demo Hospital B',
       enabledModules: ['home', 'foundation'],
       format: { ...PK_FORMAT, dateStyle: 'long' },
+      // Tenant branding as it will arrive from tenant config (F0-TEN-05).
+      theme: { light: { primary: '#0f766e', ring: '#0f766e' }, dark: { primary: '#2dd4bf' } },
     },
     branches: BRANCHES,
     permissions: ALL_PERMISSIONS,

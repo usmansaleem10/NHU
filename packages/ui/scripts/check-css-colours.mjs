@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // Fails when a stylesheet outside the token file holds a raw colour (F0-REPO-10).
 // Usage: node check-css-colours.mjs <dir> [<dir> ...]
-// Only files named tokens.css may define colours; everything else uses var(--token).
+// Only packages/ui/src/styles/tokens.css may define colours; everything else uses var(--token).
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 import { findRawColour } from '../eslint-plugin.mjs';
 
-const ALLOWED = new Set(['tokens.css']);
+// Exactly one file may define colours: the design-token sheet. Matched by full path, so a
+// tokens.css anywhere else (e.g. in a feature) gets no exemption.
+const TOKENS_FILE = resolve(import.meta.dirname, '../src/styles/tokens.css');
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.turbo']);
 
 /** @param {string} dir @returns {string[]} */
@@ -15,7 +17,7 @@ function cssFiles(dir) {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) return SKIP_DIRS.has(name) ? [] : cssFiles(path);
-    return name.endsWith('.css') && !ALLOWED.has(name) ? [path] : [];
+    return name.endsWith('.css') && resolve(path) !== TOKENS_FILE ? [path] : [];
   });
 }
 

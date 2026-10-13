@@ -1,4 +1,5 @@
 import {
+  applyTenantTheme,
   Button,
   createFormatters,
   Dialog,
@@ -56,7 +57,20 @@ function TenantFormatProvider({ children }: { children: ReactNode }) {
   return <FormatProvider value={formatters}>{children}</FormatProvider>;
 }
 
+/** Applies the tenant's token overrides (branding) for as long as the shell is mounted. */
+function useTenantTheme() {
+  const { session } = useSession();
+  const { theme } = session.tenant;
+  useEffect(() => {
+    applyTenantTheme(theme ?? {});
+    return () => {
+      applyTenantTheme({});
+    };
+  }, [theme]);
+}
+
 export function AppShell() {
+  useTenantTheme();
   return (
     <TenantFormatProvider>
       <ShellLayout />
