@@ -61,6 +61,8 @@ beforeAll(async () => {
     'grant usage on schema other to hims_app', // so the function's own check is what refuses
     'create table other.foreign_schema (at timestamptz not null) partition by range (at)',
     `create table ${'x'.repeat(56)} (at timestamptz not null) partition by range (at)`,
+    // 28 characters but 56 bytes: _pYYYYMM would push it past the 63-byte identifier limit.
+    `create table "${'é'.repeat(28)}" (at timestamptz not null) partition by range (at)`,
   ]);
   await execAsOwner(pgc.superUrl, [
     'create table not_owned (at timestamptz not null) partition by range (at)',
@@ -143,6 +145,7 @@ describe('app_ensure_monthly_partitions hardening (SECURITY DEFINER)', () => {
     ['a schema outside the allowlist', 'other.foreign_schema'],
     ['a table not owned by the function owner', 'not_owned'],
     ['a name too long for the partition suffix', 'x'.repeat(56)],
+    ['a multibyte name too long in bytes', `"${'é'.repeat(28)}"`],
   ])('refuses %s with 22023 and creates nothing', async (_case, parent) => {
     expect((await refusal(parent)).code).toBe('22023');
     const created = await owner.db.execute(

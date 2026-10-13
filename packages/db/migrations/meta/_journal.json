@@ -36,6 +36,13 @@
       "when": 1791700355469,
       "tag": "0004_tenant_keys_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791916813789,
+      "tag": "0005_partition_name_bytes",
+      "breakpoints": true
     }
   ]
 }
