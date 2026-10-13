@@ -11,3 +11,7 @@ test-results/
 
 # Claude Code local state (agent worktrees, settings)
 .claude/
+
+# Web: fixture build for E2E and extracted source maps (never deployed)
+dist-e2e/
+dist-sourcemaps/
