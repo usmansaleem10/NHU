@@ -160,6 +160,7 @@ export function SheetContent({
   className,
   children,
   title,
+  onEscapeKeyDown,
   ...props
 }: ComponentProps<typeof DialogPrimitive.Content> & { title: string }) {
   const { t } = useUiI18n();
@@ -172,6 +173,10 @@ export function SheetContent({
           'fixed inset-y-0 start-0 z-50 flex w-72 max-w-[85vw] flex-col border-e bg-sidebar text-sidebar-foreground shadow-lg',
           className,
         )}
+        onEscapeKeyDown={(event) => {
+          keepDialogOpenForOpenList(event);
+          onEscapeKeyDown?.(event);
+        }}
         {...props}
       >
         <DialogPrimitive.Title className="sr-only">{title}</DialogPrimitive.Title>
