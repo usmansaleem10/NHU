@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * HIMS E2E harness (F0-REPO-09). One folder per feature (`shell/`, `data-table/`, ...), files
- * named `*.e2e.ts`. Boots the PRODUCTION build of apps/web with `vite preview`, so code
+ * named `*.e2e.ts`. Boots a production build of apps/web (plus dev fixtures) with `vite preview`, so code
  * splitting and the bundle budget are exercised exactly as shipped.
  *
  * Seeded tenants: demo-a / demo-b (demo-a.localhost, demo-b.localhost) arrive with F0-TEN + the
@@ -48,10 +48,14 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm --filter "@hims/web..." build && pnpm --filter @hims/web preview',
+    // Dependencies' normal build, then the web app's E2E variant (production build + dev fixtures,
+    // written to apps/web/dist/e2e so the shippable dist never contains fixtures).
+    command:
+      'pnpm --filter "@hims/web^..." build && pnpm --filter @hims/web build:e2e && pnpm --filter @hims/web preview:e2e',
     cwd: repoRoot,
     url: `http://localhost:${String(port)}`,
-    reuseExistingServer: !isCI,
+    // Never silently test a stale server left running; opt in explicitly for local iteration.
+    reuseExistingServer: process.env.PW_REUSE_SERVER === '1',
     timeout: 240_000,
     stdout: 'ignore',
     stderr: 'pipe',
