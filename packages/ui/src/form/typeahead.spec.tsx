@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { Dialog, DialogContent } from '../components/overlays.js';
 import { Typeahead, type TypeaheadOption, type TypeaheadSearch } from './typeahead.js';
 
 afterEach(cleanup);
@@ -81,5 +82,56 @@ describe('Typeahead', () => {
     await screen.findAllByRole('option');
     await user.keyboard('{ArrowDown}{Enter}');
     expect(onChange).toHaveBeenLastCalledWith({ value: '2', label: 'Cardiac surgery' });
+  });
+
+  it('never shows results of a previous query while the new one is pending', async () => {
+    const search = vi.fn<TypeaheadSearch>((q) =>
+      q === 'ab'
+        ? Promise.resolve([{ value: '1', label: 'AB match' }])
+        : new Promise(() => undefined),
+    );
+    const onChange = vi.fn<(v: TypeaheadOption | null) => void>();
+    render(
+      <Typeahead value={null} onChange={onChange} search={search} debounceMs={50} minChars={2} />,
+    );
+    const user = userEvent.setup();
+    const input = screen.getByRole('combobox');
+    await user.type(input, 'ab');
+    expect(await screen.findByRole('option', { name: 'AB match' })).toBeTruthy();
+    await user.type(input, 'c');
+    // Debounce still running for "abc": "AB match" must not be offered (Enter would pick it).
+    expect(screen.queryByRole('option', { name: 'AB match' })).toBeNull();
+    await user.keyboard('{Enter}');
+    expect(onChange).not.toHaveBeenCalledWith({ value: '1', label: 'AB match' });
+  });
+
+  it('Escape closes the open list without closing the surrounding dialog', async () => {
+    const search: TypeaheadSearch = () => Promise.resolve([{ value: '1', label: 'Cardiology' }]);
+    render(
+      <Dialog defaultOpen>
+        <DialogContent title="Edit">
+          <Typeahead value={null} onChange={() => undefined} search={search} debounceMs={0} />
+        </DialogContent>
+      </Dialog>,
+    );
+    const user = userEvent.setup();
+    await user.type(screen.getByRole('combobox'), 'car');
+    await screen.findByRole('option', { name: 'Cardiology' });
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(screen.getByRole('combobox').getAttribute('aria-expanded')).toBe('false');
+    // With the list closed, Escape belongs to the dialog again.
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('announces search status through a live region outside the hidden listbox', async () => {
+    const { input, user } = setup(() => Promise.resolve([]));
+    await user.type(input, 'zz');
+    const status = await screen.findByRole('status');
+    await waitFor(() => {
+      expect(status.textContent).toBe('No matches');
+    });
+    expect(status.closest('[role="listbox"]')).toBeNull();
   });
 });

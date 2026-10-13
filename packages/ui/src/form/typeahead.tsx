@@ -35,11 +35,13 @@ export interface TypeaheadProps {
   'aria-required'?: boolean | undefined;
 }
 
+// Every non-idle phase records the query it belongs to, so a phase left over from an earlier
+// query (during the next debounce) is never shown or selectable for the current text.
 type Phase =
   | { kind: 'idle' }
-  | { kind: 'loading' }
-  | { kind: 'results'; options: readonly TypeaheadOption[] }
-  | { kind: 'error' };
+  | { kind: 'loading'; query: string }
+  | { kind: 'results'; query: string; options: readonly TypeaheadOption[] }
+  | { kind: 'error'; query: string };
 
 /**
  * ARIA 1.2 combobox with async search. Never loads options until the user has typed `minChars`
@@ -87,15 +89,15 @@ export function Typeahead({
     if (!shouldSearch) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      setPhase({ kind: 'loading' });
+      setPhase({ kind: 'loading', query });
       searchRef.current(query, { signal: controller.signal, limit: cappedLimit }).then(
         (options) => {
           if (controller.signal.aborted) return; // a newer query superseded this one
-          setPhase({ kind: 'results', options: options.slice(0, cappedLimit) });
+          setPhase({ kind: 'results', query, options: options.slice(0, cappedLimit) });
           setActive(options.length > 0 ? 0 : -1);
         },
         () => {
-          if (!controller.signal.aborted) setPhase({ kind: 'error' });
+          if (!controller.signal.aborted) setPhase({ kind: 'error', query });
         },
       );
     }, debounceMs);
@@ -105,7 +107,8 @@ export function Typeahead({
     };
   }, [shouldSearch, query, cappedLimit, debounceMs]);
 
-  const options = phase.kind === 'results' && shouldSearch ? phase.options : [];
+  const current: Phase = phase.kind !== 'idle' && phase.query === query ? phase : { kind: 'idle' };
+  const options = current.kind === 'results' && shouldSearch ? current.options : [];
   const select = (option: TypeaheadOption) => {
     onChange(option);
     setText(option.label);
@@ -115,9 +118,10 @@ export function Typeahead({
   let status: string | null = null;
   if (open && !isSelectedText) {
     if (query.length < minChars) status = t('typeahead.typeMore', { count: minChars });
-    else if (phase.kind === 'loading') status = t('typeahead.searching');
-    else if (phase.kind === 'error') status = t('typeahead.error');
-    else if (phase.kind === 'results' && options.length === 0) status = t('typeahead.noResults');
+    else if (current.kind === 'loading' || current.kind === 'idle') {
+      status = t('typeahead.searching');
+    } else if (current.kind === 'error') status = t('typeahead.error');
+    else if (options.length === 0) status = t('typeahead.noResults');
     else if (options.length >= cappedLimit)
       status = t('typeahead.moreResults', { count: cappedLimit });
   }
@@ -135,6 +139,7 @@ export function Typeahead({
         autoComplete="off"
         aria-autocomplete="list"
         aria-expanded={expanded}
+        data-typeahead-open={expanded ? '' : undefined}
         aria-controls={listId}
         aria-activedescendant={activeId}
         placeholder={placeholder}
@@ -167,13 +172,15 @@ export function Typeahead({
               e.preventDefault();
               select(option);
             }
-          } else if (e.key === 'Escape') {
+          } else if (e.key === 'Escape' && expanded) {
+            // Close only the list; the surrounding dialog ignores this Escape (see DialogContent).
+            e.preventDefault();
             setOpen(false);
           }
         }}
       />
       <span className="absolute end-1 top-1/2 flex -translate-y-1/2 items-center">
-        {phase.kind === 'loading' && shouldSearch ? (
+        {current.kind === 'loading' && shouldSearch ? (
           <Loader2
             className="m-2 size-4 animate-spin text-muted-foreground motion-reduce:animate-none"
             aria-hidden
@@ -229,15 +236,15 @@ export function Typeahead({
           </li>
         ))}
         {status ? (
-          <li
-            role="presentation"
-            aria-live="polite"
-            className="px-2 py-1.5 text-sm text-muted-foreground"
-          >
+          <li role="presentation" aria-hidden className="px-2 py-1.5 text-sm text-muted-foreground">
             {status}
           </li>
         ) : null}
       </ul>
+      {/* Always mounted (a hidden listbox can't announce): screen readers hear status changes. */}
+      <span role="status" aria-live="polite" className="sr-only">
+        {open && !isSelectedText ? (status ?? '') : ''}
+      </span>
     </div>
   );
 }

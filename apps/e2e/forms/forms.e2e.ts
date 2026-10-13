@@ -55,7 +55,10 @@ test.describe('form kit', () => {
   test('typeahead never preloads and searches the server after 2 characters', async ({ page }) => {
     const combo = page.getByRole('combobox', { name: 'Department' });
     await combo.focus();
-    await expect(page.getByText('Type at least 2 characters to search')).toBeVisible();
+    // Announced via the combobox's live region (also shown in the open list).
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Type at least 2 characters to search' }),
+    ).toHaveCount(1);
     await expect(listOptions(page)).toHaveCount(0);
     await combo.fill('Department 1');
     await expect(listOptions(page).first()).toBeVisible();

@@ -9,11 +9,23 @@ export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
 
+/**
+ * Escape first closes an open listbox inside the dialog (typeahead); only the next Escape
+ * closes the dialog itself.
+ */
+function keepDialogOpenForOpenList(event: KeyboardEvent): void {
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active.hasAttribute('data-typeahead-open')) {
+    event.preventDefault();
+  }
+}
+
 export function DialogContent({
   className,
   children,
   title,
   description,
+  onEscapeKeyDown,
   ...props
 }: ComponentProps<typeof DialogPrimitive.Content> & { title: string; description?: string }) {
   const { t } = useUiI18n();
@@ -26,6 +38,10 @@ export function DialogContent({
           className,
         )}
         {...(description ? {} : { 'aria-describedby': undefined })}
+        onEscapeKeyDown={(event) => {
+          keepDialogOpenForOpenList(event);
+          onEscapeKeyDown?.(event);
+        }}
         {...props}
       >
         <div className="flex items-start justify-between gap-4">
