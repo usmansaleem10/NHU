@@ -23,9 +23,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist .turbo",
     "lint": "eslint . --max-warnings=0 && node scripts/check-css-colours.mjs src",
-    "test": "vitest run",
+    "test": "vitest run --project unit --coverage",
     "catalogue": "ladle serve --port 61000",
-    "catalogue:build": "ladle build"
+    "catalogue:build": "ladle build",
+    "test:int": "vitest run --project integration"
   },
   "peerDependencies": {
     "react": "^19.0.0",
@@ -51,6 +52,7 @@
     "@testing-library/user-event": "^14.6.7",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@vitest/coverage-v8": "^5.0.4",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",

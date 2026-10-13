@@ -14,11 +14,11 @@ import himsUi from './eslint-plugin.mjs';
  */
 export function himsReact({ rootDir, uiStringFiles, uiStringIgnores = [] }) {
   return defineConfig(
-    ...hims({ rootDir }),
+    ...hims({ rootDir, extraHimsRules: himsUi.rules }),
     {
       files: ['**/*.{ts,tsx}'],
       languageOptions: { globals: { ...globals.browser } },
-      plugins: { 'react-hooks': reactHooks, hims: himsUi },
+      plugins: { 'react-hooks': reactHooks },
       rules: {
         ...reactHooks.configs.flat.recommended.rules,
         // We don't run the React Compiler; TanStack Table/Virtual and RHF are flagged as

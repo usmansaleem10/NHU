@@ -6,5 +6,5 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["src", ".ladle/components.tsx", ".ladle/env.d.ts", "vitest.config.ts"]
+  "include": ["src", ".ladle/components.tsx", ".ladle/env.d.ts"]
 }
