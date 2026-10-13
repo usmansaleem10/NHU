@@ -4,12 +4,13 @@
  * E2E builds (VITE_DEV_FIXTURES=true) load in-memory DEV FIXTURES through a dynamic import that
  * Rollup drops from production bundles. Screens never know which one they got.
  */
-import type {
-  FetchPage,
-  PatientSearchQuery,
-  PatientSearchResult,
-  SavedViewsStore,
-  TypeaheadSearch,
+import {
+  purgeLegacySavedViews,
+  type FetchPage,
+  type PatientSearchQuery,
+  type PatientSearchResult,
+  type SavedViewsStore,
+  type TypeaheadSearch,
 } from '@hims/ui';
 
 import type { DemoPatient, DemoRegistration } from '../features/foundation';
@@ -70,10 +71,13 @@ export const services = {} as AppServices;
 export async function initServices(): Promise<void> {
   // Both flags are statically replaced at build time, so in a production build this branch is
   // dead code and the dev-fixtures chunk is never emitted (checked by check-no-dev-fixtures).
+  const storage = browserStorage();
+  // Views saved before tenant/user scoping may hold search terms: drop them once at startup.
+  purgeLegacySavedViews(storage);
   if (import.meta.env.DEV || import.meta.env.VITE_DEV_FIXTURES === 'true') {
     const { createDevServices } = await import('../dev-fixtures');
-    Object.assign(services, createDevServices(browserStorage()));
+    Object.assign(services, createDevServices(storage));
   } else {
-    Object.assign(services, createApiServices(browserStorage()));
+    Object.assign(services, createApiServices(storage));
   }
 }

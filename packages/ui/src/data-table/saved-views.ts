@@ -129,6 +129,23 @@ export function savedViewScope(tenantId: string, userId: string, tableId: string
   return [tenantId, userId, tableId].map(encodeURIComponent).join('/');
 }
 
+/**
+ * One-time startup cleanup: views saved before tenant/user scoping live under unscoped keys
+ * (`hims.views.<table>`) and may contain search terms or identifying filters. Scoped keys always
+ * contain exactly two '/' separators (encodeURIComponent never emits '/'), so anything else under
+ * the prefix is legacy and is removed.
+ */
+export function purgeLegacySavedViews(storage: Storage, prefix = 'hims.views.'): void {
+  const legacy: string[] = [];
+  for (let i = 0; i < storage.length; i += 1) {
+    const key = storage.key(i);
+    if (key?.startsWith(prefix) && key.slice(prefix.length).split('/').length !== 3) {
+      legacy.push(key);
+    }
+  }
+  for (const key of legacy) storage.removeItem(key);
+}
+
 /** Applies a saved view: always lands on the first page. */
 export function applySavedView(view: SavedView): TableQuery {
   return { ...view.query, page: 0 };

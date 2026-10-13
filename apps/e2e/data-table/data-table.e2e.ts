@@ -154,3 +154,18 @@ test.describe('data table (server-driven)', () => {
     expect(lines.every((l) => l.split(',')[3] === 'CCU')).toBe(true);
   });
 });
+
+test('startup removes legacy unscoped saved views that could hold search terms', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('seeded')) {
+      sessionStorage.setItem('seeded', '1');
+      localStorage.setItem('hims.views.foundation.patients', '[{"query":{"search":"Ayesha"}}]');
+    }
+  });
+  await page.goto('/foundation/data-table');
+  await expect(page.getByText('1–50 of 10,000')).toBeVisible();
+  const legacy = await page.evaluate(() => localStorage.getItem('hims.views.foundation.patients'));
+  expect(legacy).toBeNull();
+});

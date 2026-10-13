@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { defaultTableQuery } from './query-state.js';
 import {
   createStorageSavedViewsStore,
+  purgeLegacySavedViews,
   savedViewScope,
   toSavedQuery,
   withoutPage,
@@ -77,5 +78,19 @@ describe('what a saved view may persist', () => {
     expect(savedViewScope('demo-a', 'u1', 'patients')).not.toBe(
       savedViewScope('demo-a', 'u2', 'patients'),
     );
+  });
+});
+
+describe('purgeLegacySavedViews', () => {
+  it('removes unscoped views from before tenant/user scoping (they may hold search terms)', () => {
+    const storage = memoryStorage();
+    const scoped = `hims.views.${savedViewScope('demo-a', 'u1', 'foundation.patients')}`;
+    storage.setItem('hims.views.foundation.patients', '[{"query":{"search":"Ayesha Khan"}}]');
+    storage.setItem(scoped, '[]');
+    storage.setItem('hims.language', 'ur');
+    purgeLegacySavedViews(storage);
+    expect(storage.getItem('hims.views.foundation.patients')).toBeNull();
+    expect(storage.getItem(scoped)).toBe('[]');
+    expect(storage.getItem('hims.language')).toBe('ur');
   });
 });
