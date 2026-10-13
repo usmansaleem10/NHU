@@ -561,16 +561,16 @@ function Pagination({
         >
           {pageSizeOptions.map((size) => (
             <option key={size} value={size}>
-              {fmt.number(size)}
+              {fmt.count(size)}
             </option>
           ))}
         </NativeSelect>
       </label>
       <span className="text-muted-foreground tabular-nums" aria-live="polite">
         {t('table.rangeOf', {
-          from: fmt.number(from),
-          to: fmt.number(to),
-          total: fmt.number(total),
+          from: fmt.count(from),
+          to: fmt.count(to),
+          total: fmt.count(total),
         })}
       </span>
       <nav
@@ -600,7 +600,7 @@ function Pagination({
           <ChevronLeft className="rtl:rotate-180" aria-hidden />
         </Button>
         <span className="px-2 tabular-nums">
-          {t('table.pageOf', { page: fmt.number(query.page + 1), pages: fmt.number(pages) })}
+          {t('table.pageOf', { page: fmt.count(query.page + 1), pages: fmt.count(pages) })}
         </span>
         <Button
           variant="ghost"
@@ -637,7 +637,7 @@ function ContinuousFooter({ loaded, total }: { loaded: number; total: number }) 
       className="border-t px-3 py-2 text-sm text-muted-foreground tabular-nums"
       aria-live="polite"
     >
-      {t('table.loadedOf', { loaded: fmt.number(loaded), total: fmt.number(total) })}
+      {t('table.loadedOf', { loaded: fmt.count(loaded), total: fmt.count(total) })}
     </div>
   );
 }

@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { createFormatters, FormatError } from './formatters.js';
+import { createFormatters, FormatError, INVALID_PLACEHOLDER } from './formatters.js';
 
-const karachi = createFormatters({ locale: 'en-PK', timeZone: 'Asia/Karachi', currency: 'PKR' });
+const karachi = createFormatters({
+  locale: 'en-PK',
+  timeZone: 'Asia/Karachi',
+  currency: 'PKR',
+  report: () => undefined,
+});
 // Expected calendar day rendered by ICU for en-PK, independent of ICU's exact punctuation.
 const oct10 = new Intl.DateTimeFormat('en-PK', { dateStyle: 'medium', timeZone: 'UTC' }).format(
   Date.UTC(2026, 9, 10),
@@ -16,13 +21,29 @@ describe('createFormatters', () => {
     expect(out).toMatch(/Rs|PKR/);
   });
 
+  it('formats money held as bigint paisa-free whole amounts', () => {
+    expect(karachi.currency(12_345n)).toMatch(/12,345\.00$/);
+  });
+
   it('always shows paisa even though ICU defaults PKR to 0 decimals', () => {
     expect(karachi.currency('1500')).toMatch(/1,500\.00$/);
   });
 
-  it('rejects money that is not a decimal string', () => {
-    expect(() => karachi.currency('12,000')).toThrow(FormatError);
-    expect(() => karachi.currency('1e5')).toThrow(FormatError);
+  it('never shows a negative zero ("-Rs 0.00") for amounts that round to zero', () => {
+    expect(karachi.currency('-0.001')).not.toContain('-');
+    expect(karachi.currency('-0')).not.toContain('-');
+    expect(karachi.currency('-1500.50')).toContain('-');
+  });
+
+  it('renders a placeholder and reports, instead of throwing, for a bad amount', () => {
+    const report = vi.fn<(e: FormatError) => void>();
+    const fmt = createFormatters({ locale: 'en-PK', timeZone: 'UTC', currency: 'PKR', report });
+    // A table cell renderer must not crash the whole screen on one bad value.
+    expect(fmt.currency('12,000')).toBe(INVALID_PLACEHOLDER);
+    expect(fmt.currency('1e5')).toBe(INVALID_PLACEHOLDER);
+    expect(fmt.dateTime('not-a-date')).toBe(INVALID_PLACEHOLDER);
+    expect(report).toHaveBeenCalledTimes(3);
+    expect(report.mock.calls[0]?.[0]).toBeInstanceOf(FormatError);
   });
 
   it('renders instants in the tenant time zone, not the browser zone', () => {
@@ -41,13 +62,11 @@ describe('createFormatters', () => {
     expect(karachi.date('2026-10-10')).toBe(oct10);
   });
 
-  it('follows the tenant locale for digit grouping', () => {
+  it('follows the tenant locale for digit grouping in decimals and counts', () => {
     const india = createFormatters({ locale: 'en-IN', timeZone: 'Asia/Kolkata', currency: 'INR' });
     expect(india.number('1234567')).toBe('12,34,567');
-    expect(karachi.number(1234567.891, 2)).toBe('1,234,567.89');
-  });
-
-  it('throws on an invalid date instead of printing "Invalid Date"', () => {
-    expect(() => karachi.dateTime('not-a-date')).toThrow(FormatError);
+    expect(karachi.number('1234567.891', 2)).toBe('1,234,567.89');
+    expect(india.count(10_000)).toBe('10,000');
+    expect(karachi.count(1_000_000)).toBe('1,000,000');
   });
 });
