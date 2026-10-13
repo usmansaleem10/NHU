@@ -2,8 +2,8 @@ import { himsReact } from '@hims/ui/eslint-react';
 import { defineConfig } from 'eslint/config';
 
 export default defineConfig(
-  // Build output outside dist/: extracted source maps.
-  { ignores: ['dist-sourcemaps/**'] },
+  // Build output outside dist/: the E2E fixture build and extracted source maps.
+  { ignores: ['dist-e2e/**', 'dist-sourcemaps/**'] },
   ...himsReact({
     rootDir: import.meta.dirname,
     // User-facing text in the app shell and every feature goes through i18n (F0-UI-06).
