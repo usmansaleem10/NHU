@@ -35,6 +35,7 @@ export const uiMessagesEn = {
   'table.refreshing': 'Refreshing…',
   'table.export': 'Export CSV',
   'table.exporting': 'Exporting…',
+  'table.exportFailed': 'Export failed. Try again.',
   'table.exportTooLarge':
     'More than {{max}} rows — narrow the filters or request a background export.',
   'table.savedViews': 'Saved views',

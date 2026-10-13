@@ -183,13 +183,23 @@ export function DataTable<T>(props: DataTableProps<T>) {
   // New query (paged) → back to the top of the viewport.
   const firstRowId = rows[0] === undefined ? undefined : getRowId(rows[0]);
   useEffect(() => {
-    if (mode === 'paged') scrollRef.current?.scrollTo({ top: 0 });
+    if (mode === 'paged' && scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [mode, query.page, firstRowId]);
 
   const paddingTop = virtualRows[0]?.start ?? 0;
   const paddingBottom = virtualizer.getTotalSize() - (virtualRows.at(-1)?.end ?? 0);
   const colCount = visibleColumns.length + (rowActions ? 1 : 0);
   const hasFilters = columns.some((c) => c.filter);
+  // ARIA row numbering counts the header rows (titles, plus filters when present).
+  const headerRows = hasFilters ? 2 : 1;
+
+  // A stale link or a shrinking result can leave us past the last page: go to the last one.
+  const lastPage = pageCount(total, query.pageSize) - 1;
+  useEffect(() => {
+    if (mode === 'paged' && status === 'success' && query.page > lastPage) {
+      onQueryChange(setPage(query, lastPage, total));
+    }
+  }, [mode, status, query, lastPage, total, onQueryChange]);
 
   let body: ReactNode;
   if (status === 'pending') {
@@ -233,7 +243,9 @@ export function DataTable<T>(props: DataTableProps<T>) {
             <tr
               key={row.id}
               data-index={vr.index}
-              aria-rowindex={vr.index + 2 + (mode === 'paged' ? query.page * query.pageSize : 0)}
+              aria-rowindex={
+                headerRows + 1 + vr.index + (mode === 'paged' ? query.page * query.pageSize : 0)
+              }
               className="border-b transition-colors hover:bg-muted/60"
               style={{ height: rowHeight }}
             >
@@ -276,10 +288,18 @@ export function DataTable<T>(props: DataTableProps<T>) {
         <ColumnChooser table={table} />
       </div>
 
-      <div ref={scrollRef} className="relative overflow-auto" style={{ height }}>
+      {/* Focusable so keyboard users can scroll the rows (WCAG 2.1.1, scrollable region). */}
+      <div
+        ref={scrollRef}
+        role="region"
+        aria-label={caption}
+        tabIndex={0}
+        className="relative overflow-auto focus-visible:outline-2 focus-visible:outline-ring"
+        style={{ height }}
+      >
         <table
           className="w-full table-fixed border-separate border-spacing-0 text-sm"
-          aria-rowcount={total + 1}
+          aria-rowcount={total + headerRows}
           aria-busy={status === 'pending' || isFetching}
         >
           <caption className="sr-only">{caption}</caption>
@@ -343,7 +363,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
               ) : null}
             </tr>
             {hasFilters ? (
-              <tr>
+              <tr aria-rowindex={2}>
                 {visibleColumns.map((col) => {
                   const meta = col.columnDef.meta as DataTableColumn<T>;
                   return (
@@ -430,24 +450,37 @@ export function DebouncedInput({
 }) {
   const [draft, setDraft] = useState(value);
   const [lastExternal, setLastExternal] = useState(value);
-  // Sync when the committed value changes from outside (saved view, back button).
+  // Values we committed that the parent hasn't echoed back yet. When the parent applies one of
+  // them (after an async navigation) it is our own echo, not an external change, so the draft —
+  // which may already hold newer keystrokes — stays.
+  const [inFlight, setInFlight] = useState<readonly string[]>([]);
+  const [committed, setCommitted] = useState(value);
   if (value !== lastExternal) {
     setLastExternal(value);
-    setDraft(value);
+    const echo = inFlight.indexOf(value);
+    if (echo >= 0) {
+      setInFlight(inFlight.slice(echo + 1));
+    } else {
+      setInFlight([]);
+      setCommitted(value);
+      setDraft(value); // saved view, back button, reset
+    }
   }
   const commitRef = useRef(onCommit);
   useEffect(() => {
     commitRef.current = onCommit;
   });
   useEffect(() => {
-    if (draft === value) return;
+    if (draft === committed) return;
     const id = setTimeout(() => {
+      setCommitted(draft);
+      setInFlight((list) => [...list, draft]);
       commitRef.current(draft);
     }, delay);
     return () => {
       clearTimeout(id);
     };
-  }, [draft, value, delay]);
+  }, [draft, committed, delay]);
   return (
     <Input
       {...props}

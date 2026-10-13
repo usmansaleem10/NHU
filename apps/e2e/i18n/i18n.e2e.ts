@@ -27,7 +27,8 @@ test.describe('i18n and tenant formatting', () => {
   });
 
   test('formats money and dates per tenant settings in English', async ({ page }) => {
-    await page.goto('/foundation/data-table?q=MR-000001');
+    await page.goto('/foundation/data-table');
+    await page.getByRole('searchbox').fill('MR-000001');
     const row = page
       .getByRole('table', { name: 'Demo patients' })
       .locator('tbody tr[data-index]')
@@ -42,7 +43,8 @@ test.describe('i18n and tenant formatting', () => {
     test.use({ language: 'ur' });
 
     test('formats dates with Urdu month names and keeps PKR amounts', async ({ page }) => {
-      await page.goto('/foundation/data-table?q=MR-000001');
+      await page.goto('/foundation/data-table');
+      await page.getByRole('searchbox').fill('MR-000001');
       const row = page.getByRole('table').locator('tbody tr[data-index]').first();
       await expect(row.locator('td').first()).toHaveText('MR-000001');
       await expect(row.locator('td').nth(4)).toHaveText(/[؀-ۿ]/);

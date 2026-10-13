@@ -52,7 +52,9 @@ test.describe('data table (server-driven)', () => {
     await page.getByRole('searchbox', { name: 'Search name or MRN' }).fill('MR-000123');
     await expect(page.getByText('1–1 of 1')).toBeVisible();
     await expect(firstCell(page, 0)).toHaveText('MR-000123');
-    await expect(page).toHaveURL(/q=MR-000123/);
+    // Search can identify a patient: it stays in memory, never in the URL (AGENTS.md rule 10).
+    expect(page.url()).not.toContain('q=');
+    expect(page.url()).not.toContain('MR-000123');
   });
 
   test('hides a column with the column chooser', async ({ page }) => {
@@ -81,17 +83,18 @@ test.describe('data table (server-driven)', () => {
     await page.getByRole('button', { name: 'Continuous scroll' }).click();
     await expect(page.getByText(/^200 of 10,000 loaded$/)).toBeVisible();
     const viewport = table(page).locator('xpath=..');
-    for (let i = 0; i < 6; i += 1) {
+    const loaded = async () =>
+      Number(
+        (await page.getByText(/of 10,000 loaded$/).textContent())?.split(' ')[0]?.replace(/,/g, ''),
+      );
+    // Each scroll to the bottom must pull in at least one more server page.
+    for (const atLeast of [400, 600, 800]) {
       await viewport.evaluate((el) => {
         el.scrollTop = el.scrollHeight;
       });
-      await page.waitForTimeout(250);
+      await expect.poll(loaded).toBeGreaterThanOrEqual(atLeast);
     }
-    const loaded = Number(
-      (await page.getByText(/of 10,000 loaded$/).textContent())?.split(' ')[0]?.replace(/,/g, ''),
-    );
-    expect(loaded).toBeGreaterThan(200);
-    expect(loaded).toBeLessThan(10_000);
+    expect(await loaded()).toBeLessThan(10_000);
     expect(await dataRows(page).count()).toBeLessThan(80);
   });
 
@@ -111,6 +114,27 @@ test.describe('data table (server-driven)', () => {
     await settled(page);
     const wards = await dataRows(page).locator('td:nth-child(4)').allTextContents();
     expect(new Set(wards)).toEqual(new Set(['ICU']));
+  });
+
+  test('saved views never persist search or identifying filters', async ({ page }) => {
+    await page.getByRole('searchbox', { name: 'Search name or MRN' }).fill('Demo Patient 00042');
+    await page.getByLabel('Filter by MRN').fill('MR-000042');
+    await page.getByLabel('Filter by Ward').selectOption('ICU');
+    await expect(page).toHaveURL(/f\.ward=ICU/);
+    expect(page.url()).not.toContain('MR-000042');
+    await page.getByRole('button', { name: 'Saved views' }).click();
+    await page.getByRole('menuitem', { name: 'Save current view' }).click();
+    await page.getByLabel('View name').fill('Private check');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('dialog')).toBeHidden();
+
+    const stored = await page.evaluate(() =>
+      JSON.stringify(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)])),
+    );
+    expect(stored).toContain('Private check');
+    expect(stored).toContain('ICU');
+    expect(stored).not.toContain('Demo Patient 00042');
+    expect(stored).not.toContain('MR-000042');
   });
 
   test('exports the current filtered query as CSV', async ({ page }) => {

@@ -22,7 +22,7 @@ import { services } from '../../../app/services';
 import { useSession } from '../../../app/session/session-provider';
 import { MasterFormDialog } from '../crud/master-form-dialog';
 import type { MasterInput, MasterMetadata, MasterRecord } from '../crud/types';
-import { MASTER_TABLE_DEFAULTS, MASTER_TABLE_OPTIONS } from '../index';
+import { MASTER_TABLE_DEFAULTS, MASTER_TABLE_OPTIONS, MASTER_URL_POLICY } from '../index';
 import { findMaster, masterKey } from '../registry';
 import { useDynamicT } from './use-dynamic-t';
 
@@ -84,7 +84,10 @@ function MasterScreen({ meta }: { meta: MasterMetadata }) {
   });
 
   const setQuery = (next: TableQuery) => {
-    void navigate({ search: serializeTableQuery(next, MASTER_TABLE_DEFAULTS), replace: true });
+    void navigate({
+      search: serializeTableQuery(next, MASTER_TABLE_DEFAULTS, MASTER_URL_POLICY),
+      replace: true,
+    });
   };
 
   const openDialog = (record: MasterRecord | null) => {

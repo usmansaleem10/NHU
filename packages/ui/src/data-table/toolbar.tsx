@@ -62,6 +62,11 @@ export function ExportButton({
         <Download aria-hidden />
         {status === 'exporting' ? t('table.exporting') : t('table.export')}
       </Button>
+      {status === 'error' ? (
+        <span role="alert" className="text-xs text-destructive">
+          {t('table.exportFailed')}
+        </span>
+      ) : null}
       {status === 'too-large' ? (
         <span role="alert" className="text-xs text-warning">
           {t('table.exportTooLarge', { max: maxRows })}

@@ -6,6 +6,8 @@ import {
   ExportButton,
   PageHeader,
   SavedViewsMenu,
+  savedViewScope,
+  sensitivePart,
   serializeTableQuery,
   setSearch,
   TableSearch,
@@ -13,6 +15,7 @@ import {
   useSavedViews,
   useTableExport,
   withoutPage,
+  withSensitive,
   type DataTableColumn,
   type ExportColumn,
   type TableQuery,
@@ -23,8 +26,14 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { services } from '../../../app/services';
+import { useSession } from '../../../app/session/session-provider';
 import { DEMO_WARDS, type DemoPatient } from '../model';
-import { PATIENT_TABLE_DEFAULTS, queryFromSearch, type TableMode } from './data-table.search';
+import {
+  PATIENT_TABLE_DEFAULTS,
+  PATIENT_URL_POLICY,
+  queryFromSearch,
+  type TableMode,
+} from './data-table.search';
 
 export const Route = createLazyRoute('/foundation/data-table')({ component: DataTableScreen });
 
@@ -124,15 +133,25 @@ function DataTableScreen() {
   const { t } = useTranslation();
   const search = useSearch({ from: '/foundation/data-table' });
   const navigate = useNavigate({ from: '/foundation/data-table' });
-  const query = useMemo(() => queryFromSearch(search), [search]);
+  // Search and identifying filters live only in memory (never URL, never storage).
+  const [sensitive, setSensitive] = useState<Pick<TableQuery, 'search' | 'filters'>>({
+    search: '',
+    filters: {},
+  });
+  const query = useMemo(
+    () => withSensitive(queryFromSearch(search), sensitive),
+    [search, sensitive],
+  );
+  const { session } = useSession();
   const mode: TableMode = search.mode === 'continuous' ? 'continuous' : 'paged';
   const { columns, exportColumns } = usePatientColumns();
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
 
   const setQuery = (next: TableQuery, nextMode: TableMode = mode) => {
+    setSensitive(sensitivePart(next, PATIENT_URL_POLICY));
     void navigate({
       search: {
-        ...serializeTableQuery(next, PATIENT_TABLE_DEFAULTS),
+        ...serializeTableQuery(next, PATIENT_TABLE_DEFAULTS, PATIENT_URL_POLICY),
         ...(nextMode === 'continuous' ? { mode: 'continuous' as const } : {}),
       },
       replace: true,
@@ -157,7 +176,11 @@ function DataTableScreen() {
     enabled: mode === 'continuous',
   });
 
-  const views = useSavedViews(TABLE_ID, services.savedViews);
+  const views = useSavedViews(
+    savedViewScope(session.tenant.id, session.user.id, TABLE_ID),
+    services.savedViews,
+    PATIENT_URL_POLICY,
+  );
   const exporter = useTableExport({
     fetchPage: services.demoPatients,
     columns: exportColumns,

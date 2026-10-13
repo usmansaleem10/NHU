@@ -15,10 +15,13 @@ export type { MasterDataSource, MasterInput, MasterRecord } from './crud/types';
 const CATALOG_ACCESS = { module: 'masters', permission: 'masters.catalog.view' } as const;
 
 export const MASTER_TABLE_DEFAULTS = defaultTableQuery({ pageSize: 50 });
+/** Masters hold reference data, not personal data, so search and filters may live in the URL. */
+export const MASTER_URL_POLICY = { search: true, filters: ['code', 'name', 'status'] } as const;
 export const MASTER_TABLE_OPTIONS = {
   sortable: ['code', 'name'],
   filterable: ['code', 'name', 'status'],
   pageSizes: [25, 50, 100],
+  url: MASTER_URL_POLICY,
 } as const;
 
 export const mastersCatalogRoute = createRoute({
@@ -36,6 +39,7 @@ export const masterRoute = createRoute({
     serializeTableQuery(
       parseTableQuery(raw, MASTER_TABLE_DEFAULTS, MASTER_TABLE_OPTIONS),
       MASTER_TABLE_DEFAULTS,
+      MASTER_URL_POLICY,
     ),
 }).lazy(() => import('./routes/master.lazy').then((m) => m.Route));
 

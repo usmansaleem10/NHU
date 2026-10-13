@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { FetchPage, TableQuery } from './query-state.js';
 
@@ -7,8 +7,9 @@ export interface ExportColumn<T> {
   value: (row: T) => string | number | boolean | null | undefined;
 }
 
-// Spreadsheet apps execute cells starting with these as formulas (CSV injection).
-const FORMULA_START = /^[=+\-@\t\r]/;
+// Spreadsheet apps execute cells starting with these as formulas (CSV injection), including
+// after leading whitespace and in full-width forms (＝＋－＠) that Excel normalises; `|` is DDE.
+const FORMULA_START = /^[\s\u3000]*[=+\-@\t\r\n\uFF1D\uFF0B\uFF0D\uFF20|]/;
 const PLAIN_NUMBER = /^-?\d+(\.\d+)?$/;
 
 function csvCell(value: string | number | boolean | null | undefined): string {
@@ -48,8 +49,14 @@ function browserDownload(csv: string, fileName: string): void {
   const a = document.createElement('a');
   a.href = url;
   a.download = fileName;
+  a.hidden = true;
+  // Firefox ignores clicks on detached anchors; revoking synchronously can cancel the download.
+  document.body.append(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 30_000);
 }
 
 /**
@@ -67,6 +74,15 @@ export function useTableExport<T>({
   const [status, setStatus] = useState<ExportStatus>('idle');
   const controller = useRef<AbortController | null>(null);
 
+  // Leaving the screen cancels an export in flight.
+  useEffect(
+    () => () => {
+      controller.current?.abort();
+    },
+    [],
+  );
+
+  /** Never rejects: failures are reported through `status` ('error'), which the button renders. */
   const exportCsv = useCallback(
     async (query: TableQuery, knownTotal?: number) => {
       if (knownTotal !== undefined && knownTotal > maxRows) {
@@ -90,10 +106,8 @@ export function useTableExport<T>({
         }
         download(toCsv(rows, columns), fileName);
         setStatus('idle');
-      } catch (error) {
-        if (ac.signal.aborted) return;
-        setStatus('error');
-        throw error;
+      } catch {
+        if (!ac.signal.aborted) setStatus('error');
       }
     },
     [fetchPage, columns, fileName, maxRows, batchSize, download],

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { defaultTableQuery } from './query-state.js';
-import { createStorageSavedViewsStore, withoutPage, type SavedView } from './saved-views.js';
+import {
+  createStorageSavedViewsStore,
+  savedViewScope,
+  toSavedQuery,
+  withoutPage,
+  type SavedView,
+} from './saved-views.js';
 
 function memoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -39,5 +45,37 @@ describe('storage saved-views store', () => {
     const store = createStorageSavedViewsStore(storage);
     expect(await store.list('patients')).toEqual([]);
     expect((await store.list('staff')).map((v) => v.id)).toEqual(['9']);
+  });
+});
+
+describe('what a saved view may persist', () => {
+  const policy = { search: false, filters: ['ward', 'status'] };
+
+  it('drops free-text search and identifying filters before anything reaches storage', () => {
+    const saved = toSavedQuery(
+      {
+        ...defaultTableQuery(),
+        page: 4,
+        sort: { id: 'name', desc: true },
+        search: 'Ayesha Khan',
+        filters: { ward: 'ICU', name: 'Ayesha', mrn: 'MR-000123' },
+      },
+      policy,
+    );
+    expect(saved).toEqual({
+      ...withoutPage(defaultTableQuery()),
+      sort: { id: 'name', desc: true },
+      search: '',
+      filters: { ward: 'ICU' },
+    });
+  });
+
+  it('keeps each user’s views apart per tenant', () => {
+    expect(savedViewScope('demo-a', 'u1', 'patients')).not.toBe(
+      savedViewScope('demo-b', 'u1', 'patients'),
+    );
+    expect(savedViewScope('demo-a', 'u1', 'patients')).not.toBe(
+      savedViewScope('demo-a', 'u2', 'patients'),
+    );
   });
 });

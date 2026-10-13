@@ -6,9 +6,11 @@ import {
   serializeTableQuery,
   setFilter,
   setPage,
+  sensitivePart,
   setPageSize,
   tableQueryKey,
   toggleSort,
+  withSensitive,
 } from './query-state.js';
 
 const defaults = defaultTableQuery({ pageSize: 50 });
@@ -49,6 +51,9 @@ describe('table query transitions', () => {
 });
 
 describe('URL round trip', () => {
+  // Reference lists with no personal data may put search and filters in the URL.
+  const open = { search: true, filters: ['status'] };
+
   it('serialises only non-default values and parses them back', () => {
     const q = {
       ...defaults,
@@ -58,7 +63,7 @@ describe('URL round trip', () => {
       search: 'ali',
       filters: { status: 'active' },
     };
-    const params = serializeTableQuery(q, defaults);
+    const params = serializeTableQuery(q, defaults, open);
     expect(params).toEqual({
       page: '3',
       size: '100',
@@ -66,15 +71,15 @@ describe('URL round trip', () => {
       q: 'ali',
       'f.status': 'active',
     });
-    expect(parseTableQuery(params, defaults, options)).toEqual(q);
-    expect(serializeTableQuery(defaults, defaults)).toEqual({});
+    expect(parseTableQuery(params, defaults, { ...options, url: open })).toEqual(q);
+    expect(serializeTableQuery(defaults, defaults, open)).toEqual({});
   });
 
   it('ignores tampered params instead of passing them to the server', () => {
     const parsed = parseTableQuery(
       { page: '0', size: '1000000', sort: 'password', 'f.cnic': '35202', q: 42 },
       defaults,
-      options,
+      { ...options, url: open },
     );
     expect(parsed).toEqual({ ...defaults, search: '42' });
   });
@@ -83,5 +88,50 @@ describe('URL round trip', () => {
     const a = { ...defaults, filters: { a: '1', b: '2' } };
     const b = { ...defaults, filters: { b: '2', a: '1' } };
     expect(tableQueryKey(a)).toBe(tableQueryKey(b));
+  });
+});
+
+describe('personal data stays out of the URL', () => {
+  // Patient list: name/MRN filters and free-text search can identify a patient.
+  const policy = { search: false, filters: ['status'] };
+  const q = {
+    ...defaults,
+    sort: { id: 'name', desc: false },
+    search: 'Ayesha Khan',
+    filters: { status: 'active', name: 'Ayesha', mrn: 'MR-000123' },
+  };
+
+  it('serialises only sort/page/size and the url-safe filters', () => {
+    expect(serializeTableQuery(q, defaults, policy)).toEqual({
+      sort: 'name',
+      'f.status': 'active',
+    });
+  });
+
+  it('refuses personal params arriving in a URL (e.g. an old shared link)', () => {
+    const parsed = parseTableQuery(
+      { q: 'Ayesha', 'f.name': 'Ayesha', 'f.status': 'active' },
+      defaults,
+      {
+        ...options,
+        filterable: ['status', 'name'],
+        url: policy,
+      },
+    );
+    expect(parsed).toEqual({ ...defaults, filters: { status: 'active' } });
+  });
+
+  it('splits off the sensitive part to keep in memory and merges it back', () => {
+    const sensitive = sensitivePart(q, policy);
+    expect(sensitive).toEqual({
+      search: 'Ayesha Khan',
+      filters: { name: 'Ayesha', mrn: 'MR-000123' },
+    });
+    const fromUrl = parseTableQuery(serializeTableQuery(q, defaults, policy), defaults, {
+      ...options,
+      sortable: ['name'],
+      url: policy,
+    });
+    expect(withSensitive(fromUrl, sensitive)).toEqual(q);
   });
 });

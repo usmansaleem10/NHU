@@ -32,6 +32,15 @@ describe('toCsv', () => {
     expect(body).toBe(`"'=HYPERLINK(""http://x"")",'@SUM(A1),'-1+cmd`);
   });
 
+  it.each([' =1+1', '\n=1', '\t=1', '\u3000=1', '\uFF1D1+1', '\uFF0BA1', '|cmd', '\uFF20SUM(A1)'])(
+    'neutralises formula prefixes hidden behind whitespace or full-width forms: %j',
+    (value) => {
+      const cell =
+        toCsv([{ name: value, note: null, amount: '1' }], columns).split('\r\n')[1] ?? '';
+      expect(cell.replace(/^"/, '').startsWith("'")).toBe(true);
+    },
+  );
+
   it('leaves negative amounts as numbers', () => {
     expect(toCsv([{ name: 'A', note: '', amount: '-5.00' }], columns).split('\r\n')[1]).toBe(
       'A,,-5.00',

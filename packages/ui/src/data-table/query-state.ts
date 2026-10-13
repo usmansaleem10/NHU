@@ -78,20 +78,65 @@ export function setPageSize(query: TableQuery, pageSize: number): TableQuery {
 export type TableSearchParams = Partial<Record<'page' | 'size' | 'sort' | 'q', string>> &
   Record<`f.${string}`, string>;
 
-export function serializeTableQuery(query: TableQuery, defaults: TableQuery): TableSearchParams {
+/**
+ * What may be written to the page URL (and to saved views). URLs end up in history, logs,
+ * screenshots and shared links, so personal data never goes there (AGENTS.md rule 10):
+ * free-text search can hold a name or MRN, and identifier filters are identifiers.
+ */
+export interface UrlPolicy {
+  /** Allow the free-text search (only for lists with no personal data, e.g. masters). */
+  search: boolean;
+  /** Filter columns whose values are safe in a URL (enums like status/ward, not identifiers). */
+  filters: readonly string[];
+}
+
+export function serializeTableQuery(
+  query: TableQuery,
+  defaults: TableQuery,
+  policy: UrlPolicy,
+): TableSearchParams {
   const out: Record<string, string> = {};
   if (query.page !== defaults.page) out.page = String(query.page + 1);
   if (query.pageSize !== defaults.pageSize) out.size = String(query.pageSize);
   if (query.sort) out.sort = `${query.sort.desc ? '-' : ''}${query.sort.id}`;
-  if (query.search) out.q = query.search;
-  for (const [id, value] of Object.entries(query.filters)) out[`f.${id}`] = value;
+  if (query.search && policy.search) out.q = query.search;
+  for (const [id, value] of Object.entries(query.filters)) {
+    if (policy.filters.includes(id)) out[`f.${id}`] = value;
+  }
   return out;
+}
+
+/** The parts of a query that must NOT go to the URL; keep them in memory. */
+export function sensitivePart(
+  query: TableQuery,
+  policy: UrlPolicy,
+): Pick<TableQuery, 'search' | 'filters'> {
+  return {
+    search: policy.search ? '' : query.search,
+    filters: Object.fromEntries(
+      Object.entries(query.filters).filter(([id]) => !policy.filters.includes(id)),
+    ),
+  };
+}
+
+/** Re-attaches the in-memory sensitive part to a query parsed from the URL. */
+export function withSensitive(
+  query: TableQuery,
+  sensitive: Pick<TableQuery, 'search' | 'filters'>,
+): TableQuery {
+  return {
+    ...query,
+    search: sensitive.search || query.search,
+    filters: { ...query.filters, ...sensitive.filters },
+  };
 }
 
 export interface ParseOptions {
   sortable: readonly string[];
   filterable: readonly string[];
   pageSizes: readonly number[];
+  /** Only what this policy allows is read back from the URL. */
+  url: UrlPolicy;
 }
 
 /**
@@ -121,14 +166,18 @@ export function parseTableQuery(
     sort = options.sortable.includes(id) ? { id, desc } : defaults.sort;
   }
 
-  const search = (str(raw.q) ?? defaults.search).slice(0, 200);
+  const search = options.url.search
+    ? (str(raw.q) ?? defaults.search).slice(0, 200)
+    : defaults.search;
 
   const filters: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (!key.startsWith('f.')) continue;
     const id = key.slice(2);
     const v = str(value)?.trim();
-    if (v && options.filterable.includes(id)) filters[id] = v.slice(0, 200);
+    if (v && options.filterable.includes(id) && options.url.filters.includes(id)) {
+      filters[id] = v.slice(0, 200);
+    }
   }
 
   return { page, pageSize, sort, search, filters };

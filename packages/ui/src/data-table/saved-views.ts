@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { TableQuery } from './query-state.js';
+import type { TableQuery, UrlPolicy } from './query-state.js';
 
 /** A named table configuration: filters, sort, search, page size and visible columns. */
 export interface SavedView {
@@ -59,7 +59,8 @@ export function createStorageSavedViewsStore(
   };
 }
 
-export function useSavedViews(tableId: string, store: SavedViewsStore) {
+/** `tableId` should be a savedViewScope(); `policy` decides what may be persisted. */
+export function useSavedViews(tableId: string, store: SavedViewsStore, policy: UrlPolicy) {
   const [views, setViews] = useState<SavedView[]>([]);
 
   const refresh = useCallback(async () => {
@@ -81,12 +82,12 @@ export function useSavedViews(tableId: string, store: SavedViewsStore) {
       await store.save(tableId, {
         id: crypto.randomUUID(),
         name: name.trim(),
-        query: withoutPage(query),
+        query: toSavedQuery(query, policy),
         columnVisibility,
       });
       await refresh();
     },
-    [store, tableId, refresh],
+    [store, tableId, refresh, policy],
   );
 
   const remove = useCallback(
@@ -107,6 +108,25 @@ export function withoutPage(query: TableQuery): Omit<TableQuery, 'page'> {
     search: query.search,
     filters: query.filters,
   };
+}
+
+/**
+ * What a saved view may persist: the same rule as the URL (browser storage is no place for
+ * personal data either). Search and identifying filters are dropped.
+ */
+export function toSavedQuery(query: TableQuery, policy: UrlPolicy): Omit<TableQuery, 'page'> {
+  return {
+    ...withoutPage(query),
+    search: policy.search ? query.search : '',
+    filters: Object.fromEntries(
+      Object.entries(query.filters).filter(([id]) => policy.filters.includes(id)),
+    ),
+  };
+}
+
+/** Storage scope for one user's views of one table, so tenants and users never share views. */
+export function savedViewScope(tenantId: string, userId: string, tableId: string): string {
+  return [tenantId, userId, tableId].map(encodeURIComponent).join('/');
 }
 
 /** Applies a saved view: always lands on the first page. */
