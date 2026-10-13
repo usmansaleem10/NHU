@@ -50,13 +50,26 @@ export function toggleSort(query: TableQuery, columnId: string): TableQuery {
   return { ...query, sort, page: 0 };
 }
 
+/**
+ * Sets a column filter exactly as typed (a blank value removes it). Values are NOT trimmed here:
+ * the filter input echoes this state back while the user is still typing, so trimming would eat
+ * the space in "Ali |Khan". Trim when building the request (toRequestQuery).
+ */
 export function setFilter(query: TableQuery, columnId: string, value: string): TableQuery {
-  const trimmed = value.trim();
   const filters = Object.fromEntries(
     Object.entries(query.filters).filter(([id]) => id !== columnId),
   );
-  if (trimmed) filters[columnId] = trimmed;
+  if (value.trim()) filters[columnId] = value;
   return { ...query, filters, page: 0 };
+}
+
+/** The query as sent to the server (and used as the cache key): text trimmed. */
+export function toRequestQuery(query: TableQuery): TableQuery {
+  return {
+    ...query,
+    search: query.search.trim(),
+    filters: Object.fromEntries(Object.entries(query.filters).map(([id, v]) => [id, v.trim()])),
+  };
 }
 
 export function setSearch(query: TableQuery, search: string): TableQuery {
@@ -174,8 +187,8 @@ export function parseTableQuery(
   for (const [key, value] of Object.entries(raw)) {
     if (!key.startsWith('f.')) continue;
     const id = key.slice(2);
-    const v = str(value)?.trim();
-    if (v && options.filterable.includes(id) && options.url.filters.includes(id)) {
+    const v = str(value); // kept as typed (see setFilter); trimmed by toRequestQuery
+    if (v?.trim() && options.filterable.includes(id) && options.url.filters.includes(id)) {
       filters[id] = v.slice(0, 200);
     }
   }

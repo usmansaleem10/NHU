@@ -10,6 +10,7 @@ import {
   setPageSize,
   tableQueryKey,
   toggleSort,
+  toRequestQuery,
   withSensitive,
 } from './query-state.js';
 
@@ -31,10 +32,20 @@ describe('table query transitions', () => {
     expect(q.sort).toEqual({ id: 'mrn', desc: false });
   });
 
-  it('removes blank filters and resets paging when a filter changes', () => {
-    const withFilter = setFilter({ ...defaults, page: 7 }, 'status', ' active ');
-    expect(withFilter).toMatchObject({ filters: { status: 'active' }, page: 0 });
-    expect(setFilter(withFilter, 'status', '   ').filters).toEqual({});
+  it('keeps what the user typed, removes blank filters and resets paging', () => {
+    // Untrimmed in state: trimming here would fight the input still being typed ("Ali |").
+    const withFilter = setFilter({ ...defaults, page: 7 }, 'name', 'Ali ');
+    expect(withFilter).toMatchObject({ filters: { name: 'Ali ' }, page: 0 });
+    expect(setFilter(withFilter, 'name', '   ').filters).toEqual({});
+  });
+
+  it('trims search and filters only when building the server request', () => {
+    const q = { ...defaults, search: '  ayesha ', filters: { name: 'Ali ', ward: ' ICU' } };
+    expect(toRequestQuery(q)).toEqual({
+      ...q,
+      search: 'ayesha',
+      filters: { name: 'Ali', ward: 'ICU' },
+    });
   });
 
   it('clamps page to the available range', () => {

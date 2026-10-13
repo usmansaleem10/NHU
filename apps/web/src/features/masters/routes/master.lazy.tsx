@@ -6,6 +6,7 @@ import {
   serializeTableQuery,
   setSearch,
   StatePanel,
+  toRequestQuery,
   TableSearch,
   parseTableQuery,
   type DataTableColumn,
@@ -56,6 +57,7 @@ function MasterScreen({ meta }: { meta: MasterMetadata }) {
     () => parseTableQuery(search, MASTER_TABLE_DEFAULTS, MASTER_TABLE_OPTIONS),
     [search],
   );
+  const request = useMemo(() => toRequestQuery(query), [query]);
   const source = services.masters(meta.id);
   const canCreate = canAccess(access, { module: meta.module, permission: meta.permissions.create });
   const canUpdate = canAccess(access, { module: meta.module, permission: meta.permissions.update });
@@ -68,8 +70,8 @@ function MasterScreen({ meta }: { meta: MasterMetadata }) {
 
   const listKey = ['masters', meta.id, 'list'] as const;
   const list = useQuery({
-    queryKey: [...listKey, query],
-    queryFn: ({ signal }) => source.list(query, signal),
+    queryKey: [...listKey, request],
+    queryFn: ({ signal }) => source.list(request, signal),
     placeholderData: keepPreviousData,
   });
 

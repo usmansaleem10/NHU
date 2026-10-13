@@ -11,6 +11,7 @@ import {
   serializeTableQuery,
   setSearch,
   TableSearch,
+  toRequestQuery,
   useFormatters,
   useSavedViews,
   useTableExport,
@@ -142,6 +143,8 @@ function DataTableScreen() {
     () => withSensitive(queryFromSearch(search), sensitive),
     [search, sensitive],
   );
+  // What the server sees: same query with typed text trimmed.
+  const request = useMemo(() => toRequestQuery(query), [query]);
   const { session } = useSession();
   const mode: TableMode = search.mode === 'continuous' ? 'continuous' : 'paged';
   const { columns, exportColumns } = usePatientColumns();
@@ -159,17 +162,17 @@ function DataTableScreen() {
   };
 
   const paged = useQuery({
-    queryKey: ['demo-patients', 'page', query],
-    queryFn: ({ signal }) => services.demoPatients(query, signal),
+    queryKey: ['demo-patients', 'page', request],
+    queryFn: ({ signal }) => services.demoPatients(request, signal),
     placeholderData: keepPreviousData,
     enabled: mode === 'paged',
   });
 
-  const continuousKey = withoutPage(query);
+  const continuousKey = withoutPage(request);
   const continuous = useInfiniteQuery({
     queryKey: ['demo-patients', 'infinite', continuousKey],
     queryFn: ({ pageParam, signal }) =>
-      services.demoPatients({ ...query, page: pageParam, pageSize: CONTINUOUS_PAGE }, signal),
+      services.demoPatients({ ...request, page: pageParam, pageSize: CONTINUOUS_PAGE }, signal),
     initialPageParam: 0,
     getNextPageParam: (last, all) =>
       all.length * CONTINUOUS_PAGE < last.total ? all.length : undefined,
@@ -269,7 +272,7 @@ function DataTableScreen() {
               status={exporter.status}
               maxRows={exporter.maxRows}
               onExport={() => {
-                void exporter.exportCsv(query, total);
+                void exporter.exportCsv(request, total);
               }}
             />
           </>
