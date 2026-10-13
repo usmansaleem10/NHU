@@ -13,6 +13,8 @@ on:
   push:
     branches: [main]
   pull_request:
+    # edited: re-check the PR title (it becomes the squash-merge message) after a rename.
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
 
 concurrency:

@@ -13,10 +13,20 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist .turbo",
-    "lint": "eslint . --max-warnings=0"
+    "clean": "rm -rf dist coverage .turbo",
+    "lint": "eslint . --max-warnings=0",
+    "test": "vitest run --project unit --coverage",
+    "test:int": "vitest run --project integration"
   },
   "devDependencies": {
-    "@hims/config": "workspace:*"
+    "@hims/config": "workspace:*",
+    "@vitest/coverage-v8": "^5.0.3",
+    "vitest": "^5.0.3"
+  },
+  "dependencies": {
+    "@orpc/client": "^1.15.5",
+    "@orpc/contract": "^1.15.5",
+    "@orpc/openapi-client": "^1.15.5",
+    "zod": "^4.6.5"
   }
 }

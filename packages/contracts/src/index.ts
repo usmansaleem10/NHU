@@ -1,3 +1,7 @@
-/** Version prefix for every API route: /api/v1/<resource>. */
-export const API_VERSION = 'v1' as const;
-export type ApiVersion = typeof API_VERSION;
+export * from './api-version.js';
+export * from './client.js';
+export * from './contract.js';
+export * from './health/health.contract.js';
+export * from './list.js';
+export * from './meta/meta.contract.js';
+export * from './problem.js';
