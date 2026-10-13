@@ -213,12 +213,16 @@ describe('tenant RLS guard', () => {
       `create policy sloppy on wrong_name using (${predicate}) with check (${predicate})`,
       ...forced('select_only'),
       `create policy tenant_isolation on select_only for select using (${predicate})`,
+      ...forced('extra_permissive'),
+      `create policy tenant_isolation on extra_permissive using (${predicate}) with check (${predicate})`,
+      'create policy allow_all on extra_permissive using (true)', // permissive policies OR together
       ...forced('no_check'),
       `create policy tenant_isolation on no_check using (${predicate})`,
     ]);
     const owner = createDatabase({ connectionString: pgc.superUrl });
     try {
       expect(await findTenantTablesWithoutRls(owner.db)).toEqual([
+        { table: 'public.extra_permissive', problems: ['extra_permissive_policy'] },
         { table: 'public.forgot_force', problems: ['rls_not_forced', 'no_tenant_policy'] },
         {
           table: 'public.forgot_rls',
@@ -226,12 +230,15 @@ describe('tenant RLS guard', () => {
         },
         { table: 'public.no_check', problems: ['no_tenant_policy'] },
         { table: 'public.select_only', problems: ['no_tenant_policy'] },
-        { table: 'public.wrong_name', problems: ['no_tenant_policy'] },
+        {
+          table: 'public.wrong_name',
+          problems: ['no_tenant_policy', 'extra_permissive_policy'],
+        },
       ]);
     } finally {
       await owner.close();
       await execAsOwner(pgc.ownerUrl, [
-        'drop table forgot_rls, forgot_force, no_tenant, wrong_name, select_only, no_check',
+        'drop table forgot_rls, forgot_force, no_tenant, wrong_name, select_only, no_check, extra_permissive',
       ]);
     }
   });

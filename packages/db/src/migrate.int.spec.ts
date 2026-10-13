@@ -97,6 +97,26 @@ describe('runMigrations', () => {
     expect(await appliedMigrations()).toBe(before);
   });
 
+  it('rolls back a data migration that switches FORCE RLS off and forgets to restore it', async () => {
+    const before = await appliedMigrations();
+    const folder = migrationsWith(
+      '9001_no_force',
+      'ALTER TABLE "tenant_keys" NO FORCE ROW LEVEL SECURITY;',
+    );
+
+    await expect(
+      runMigrations({ connectionString: pgc.ownerUrl, migrationsFolder: folder }),
+    ).rejects.toBeInstanceOf(TenantRlsMissingError);
+
+    const { rows } = await withClient(pgc.ownerUrl, (c) =>
+      c.query<{ forced: boolean }>(
+        `select relforcerowsecurity as forced from pg_class where oid = 'public.tenant_keys'::regclass`,
+      ),
+    );
+    expect(rows[0]?.forced).toBe(true);
+    expect(await appliedMigrations()).toBe(before);
+  });
+
   it('serialises concurrent migrators on a fresh database (e.g. replicas deploying at once)', async () => {
     await withClient(pgc.superUrl, async (c) => {
       await c.query('create database concurrent owner hims_owner');

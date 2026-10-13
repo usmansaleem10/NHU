@@ -52,7 +52,8 @@ export function tenantRlsSql(table: PgTable | string, options: TenantRlsOptions 
   ];
 }
 
-export type RlsProblem = 'rls_disabled' | 'rls_not_forced' | 'no_tenant_policy';
+export type RlsProblem =
+  'rls_disabled' | 'rls_not_forced' | 'no_tenant_policy' | 'extra_permissive_policy';
 
 export interface TenantTableRlsViolation {
   table: string;
@@ -62,7 +63,8 @@ export interface TenantTableRlsViolation {
 /**
  * Every table (or partition) with a tenant_id column must have RLS enabled and forced, and every
  * non-partition one must carry a permissive policy named tenant_isolation for ALL commands with
- * both USING and WITH CHECK (what tenantRlsSql emits). Partitions need no policy: through the parent the
+ * both USING and WITH CHECK (what tenantRlsSql emits), and no other permissive policy: permissive
+ * policies are OR-ed, so a second one (e.g. USING (true)) would silently widen access. Partitions need no policy: through the parent the
  * parent's policy applies, and direct access with RLS on and no policy returns nothing.
  */
 export async function findTenantTablesWithoutRls(
@@ -74,6 +76,7 @@ export async function findTenantTablesWithoutRls(
     forced: boolean;
     is_partition: boolean;
     has_tenant_policy: boolean;
+    has_extra_permissive: boolean;
   }>(sql`
     select format('%I.%I', n.nspname, c.relname) as name,
            c.relrowsecurity as enabled,
@@ -83,7 +86,11 @@ export async function findTenantTablesWithoutRls(
              select 1 from pg_policy p
               where p.polrelid = c.oid and p.polname = ${TENANT_POLICY} and p.polcmd = '*'
                 and p.polpermissive and p.polqual is not null and p.polwithcheck is not null
-           ) as has_tenant_policy
+           ) as has_tenant_policy,
+           exists (
+             select 1 from pg_policy p
+              where p.polrelid = c.oid and p.polpermissive and p.polname <> ${TENANT_POLICY}
+           ) as has_extra_permissive
       from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
       join pg_attribute a on a.attrelid = c.oid and a.attname = 'tenant_id' and not a.attisdropped
@@ -97,6 +104,7 @@ export async function findTenantTablesWithoutRls(
     if (!row.enabled) problems.push('rls_disabled');
     if (!row.forced) problems.push('rls_not_forced');
     if (!row.is_partition && !row.has_tenant_policy) problems.push('no_tenant_policy');
+    if (row.has_extra_permissive) problems.push('extra_permissive_policy');
     return problems.length > 0 ? [{ table: row.name, problems }] : [];
   });
 }

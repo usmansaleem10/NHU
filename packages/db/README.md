@@ -15,6 +15,9 @@ pipeline and base columns. Feature tables live in `apps/api/src/features/<featur
 `SECURITY DEFINER` functions run with no more than owner rights, and `FORCE ROW LEVEL SECURITY`
 binds the owner too. The superuser `hims` only creates roles (`docker/postgres/init/01-roles.sql`).
 
+Dev volumes created before `hims_owner` existed must be recreated: `pnpm deps:reset` (deletes
+local Postgres/Redis data), then `pnpm deps:up` and `db:migrate`.
+
 ```ts
 import { createDatabase } from '@hims/db';
 
@@ -121,10 +124,33 @@ const beds = await withTenant(db, { tenantId, branchId /* uuid | 'all' */, userI
 
 `assertTenantTablesHaveRls(db)` fails if any table or partition with a `tenant_id` column lacks
 RLS enabled or forced, or (for non-partitions) a permissive `tenant_isolation` policy for ALL
-commands with both `USING` and `WITH CHECK`. It runs:
+commands with both `USING` and `WITH CHECK`, or that has **any other permissive policy**
+(permissive policies are OR-ed, so e.g. `USING (true)` would open the table). It runs:
 
 - inside the `runMigrations()` / `db:migrate` transaction, so a bad migration rolls back;
 - in `src/tenancy/rls.int.spec.ts` against all real migrations, so CI fails first.
+
+### Data migrations on tenant tables
+
+Migrations run as `hims_owner` with no tenant context, and FORCE RLS binds the owner, so an
+`UPDATE`/`INSERT ... SELECT` on a tenant table in a migration **silently affects 0 rows**. Two
+patterns:
+
+1. **Per tenant** (preferred for backfills in code): loop over tenants and run each batch inside
+   `withTenant(ownerDb, { tenantId, branchId: 'all' }, tx => ...)`, so the policy applies as normal.
+2. **Inside one SQL migration**: lift FORCE for that table only and restore it before the end:
+
+   ```sql
+   ALTER TABLE "wards" NO FORCE ROW LEVEL SECURITY;
+   --> statement-breakpoint
+   UPDATE "wards" SET ...;
+   --> statement-breakpoint
+   ALTER TABLE "wards" FORCE ROW LEVEL SECURITY;
+   ```
+
+   The whole batch is one transaction, so nothing else sees the table un-forced. If the re-FORCE
+   is forgotten, the guard fails at the end of `db:migrate` and the batch rolls back
+   (`TenantRlsMissingError`; tested in `src/migrate.int.spec.ts`).
 
 ## Time partitioning (high-volume tables)
 
