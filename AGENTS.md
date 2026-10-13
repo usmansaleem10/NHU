@@ -104,7 +104,7 @@ docs/adr/      architecture decision records
    - duplicated tests at several layers for the same rule
 
    Test business rules, edge cases, permissions/scopes, tenancy and money/stock maths.
-4. **Tenancy test:** any new table or endpoint needs a test proving tenant A can't read or write tenant B's data.
+4. **Tenancy test:** any new table or endpoint needs a test proving tenant A can't read or write tenant B's data Use the `@hims/db/testing` helpers (`assertTenantIsolation`, `assertTableTenantIsolation`) with `startTestDatabase()` from `@hims/db/testing/containers`, asserting through `appUrl` (never the owner).
 5. Integration tests run against real Postgres (Testcontainers), never a mocked DB.
 6. **Coverage is visible on GitHub.** CI uploads Vitest coverage (lcov) and posts a coverage summary on every PR (Codecov or a coverage-comment action), and a README badge shows it. Coverage must not drop on a PR for `apps/api` service files. We gate on coverage of meaningful code, not on a vanity percentage.
 
