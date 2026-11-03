@@ -2,19 +2,49 @@
   "name": "@hims/web",
   "version": "0.0.0",
   "private": true,
-  "description": "HIMS web app (React + Vite from F0-UI-01)",
+  "description": "HIMS web app: React 19 + Vite + TanStack Router/Query",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "dev": "vite --port 5173 --strictPort",
+    "build": "tsc -p tsconfig.build.json && vite build && node scripts/check-bundle-size.mjs dist && node scripts/check-no-dev-fixtures.mjs dist && node scripts/extract-sourcemaps.mjs dist dist-sourcemaps",
+    "build:e2e": "tsc -p tsconfig.build.json && VITE_DEV_FIXTURES=true vite build --outDir dist-e2e --emptyOutDir && node scripts/check-bundle-size.mjs dist-e2e && node scripts/check-no-dev-fixtures.mjs --expect-fixtures dist-e2e",
+    "preview": "vite preview --port 4173 --strictPort",
+    "preview:e2e": "vite preview --outDir dist-e2e --port 4173 --strictPort",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist .turbo",
-    "lint": "eslint . --max-warnings=0"
+    "clean": "rm -rf dist dist-e2e dist-sourcemaps .turbo",
+    "lint": "eslint . --max-warnings=0 && node node_modules/@hims/ui/scripts/check-css-colours.mjs src",
+    "test": "vitest run --project unit --coverage",
+    "test:int": "vitest run --project integration"
   },
   "dependencies": {
     "@hims/contracts": "workspace:*",
-    "@hims/ui": "workspace:*"
+    "@hims/ui": "workspace:*",
+    "@hookform/resolvers": "^5.9.1",
+    "@tanstack/react-query": "^5.104.1",
+    "@tanstack/react-router": "^1.170.42",
+    "i18next": "^26.4.3",
+    "lucide-react": "^1.55.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-hook-form": "^7.89.0",
+    "react-i18next": "^17.0.16",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@hims/config": "workspace:*"
+    "@hims/config": "workspace:*",
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/coverage-v8": "^5.0.4",
+    "eslint": "^10.12.0",
+    "jsdom": "^30.1.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3"
   }
 }

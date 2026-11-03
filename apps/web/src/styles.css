@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+@import '@hims/ui/styles.css';
+
+/* Generate utilities used inside the shared kit, not only in this app. */
+@source '../../../packages/ui/src';

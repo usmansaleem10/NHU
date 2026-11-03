@@ -9,8 +9,13 @@ import tseslint from 'typescript-eslint';
 
 import { himsPlugin } from './src/eslint/import-boundaries.mjs';
 
-/** @param {{ rootDir: string }} options */
-export function hims({ rootDir }) {
+/**
+ * @param {{ rootDir: string, extraHimsRules?: Record<string, import('eslint').Rule.RuleModule> }} options
+ *   extraHimsRules: more `hims/*` rules (e.g. packages/ui's React rules). ESLint allows one object
+ *   per plugin namespace, so they are merged into the single `hims` plugin here.
+ */
+export function hims({ rootDir, extraHimsRules = {} }) {
+  const plugin = { ...himsPlugin, rules: { ...himsPlugin.rules, ...extraHimsRules } };
   return defineConfig(
     {
       ignores: [
@@ -27,7 +32,7 @@ export function hims({ rootDir }) {
     tseslint.configs.strictTypeChecked,
     comments.recommended,
     {
-      plugins: { hims: himsPlugin },
+      plugins: { hims: plugin },
       languageOptions: {
         globals: { ...globals.node },
         parserOptions: { projectService: true, tsconfigRootDir: rootDir },
