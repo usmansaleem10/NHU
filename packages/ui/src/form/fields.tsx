@@ -92,7 +92,10 @@ export function FieldShell({
 
 function useFieldError<T extends FieldValues>(name: Path<T>): string | undefined {
   const { formState } = useFormContext<T>();
-  const err = get(formState.errors, name) as { message?: unknown } | undefined;
+  const err = get<typeof formState.errors, { message?: unknown } | undefined>(
+    formState.errors,
+    name,
+  );
   return typeof err?.message === 'string' ? err.message : undefined;
 }
 

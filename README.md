@@ -31,7 +31,7 @@ pnpm status
 
 | Service | Purpose | Host port | Connect with |
 |---|---|---|---|
-| Postgres 17 | Primary database | 5432 | `postgres://hims:hims@localhost:5432/hims` as owner: **migrations and admin only** (superuser, bypasses RLS) |
+| Postgres 17 | Primary database | 5432 | `postgres://hims_owner:hims_owner@localhost:5432/hims`: schema owner, **migrations only** (not superuser, RLS applies). `hims:hims` is the bootstrap superuser: role setup only |
 | PgBouncer | Connection pooling (transaction mode), **used by the API** | 6432 | `postgres://hims_app:hims_app@localhost:6432/hims` (app role, no superuser, RLS enforced) |
 | Redis 8 | Sessions, cache, BullMQ jobs | 6379 | `redis://localhost:6379` |
 | Gotenberg 8 | HTML → PDF printing | 3100 | `http://localhost:3100` (3000 is kept free for the API) |
@@ -40,7 +40,7 @@ pnpm status
 
 Credentials are for local development only, and every port binds to `127.0.0.1`, so nothing is reachable from your network. Ports clash with something already running? Copy `.env.example` to `.env` and change them.
 
-The `hims_app` role is created by `docker/postgres/init/01-roles.sql` the first time the Postgres volume is created. If you change that file, run `pnpm deps:reset` to recreate it.
+The `hims_owner` and `hims_app` roles are created by `docker/postgres/init/01-roles.sql` the first time the Postgres volume is created. If you change that file (or your volume predates `hims_owner`), run `pnpm deps:reset` to recreate it.
 
 | Command | What it does |
 |---|---|

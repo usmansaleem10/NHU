@@ -1,4 +1,7 @@
-import { API_VERSION } from '@hims/contracts';
+import { bootstrap } from './app/bootstrap';
 
-// Placeholder entry until the NestJS/Fastify bootstrap lands in F0-API-01.
-export const apiPrefix = `/api/${API_VERSION}`;
+// Fail fast: an invalid environment or a failed boot exits non-zero before serving traffic.
+bootstrap(process.env).catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+});

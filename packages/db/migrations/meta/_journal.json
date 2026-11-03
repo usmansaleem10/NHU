@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791653114111,
+      "tag": "0000_tenancy_context",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791654269000,
+      "tag": "0001_monthly_partitions",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791654475351,
+      "tag": "0002_tenant_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791699816899,
+      "tag": "0003_harden_monthly_partitions",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791700355469,
+      "tag": "0004_tenant_keys_append_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791916813789,
+      "tag": "0005_partition_name_bytes",
+      "breakpoints": true
+    }
+  ]
+}

@@ -39,7 +39,7 @@ New work found along the way goes in as a new row with the next ID in that epic.
 | Language | TypeScript 6.0.x (`~6.0`), `strict` everywhere (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`). Not 7.x: typescript-eslint supports only `<6.1` |
 | Repo | **Monorepo** with pnpm workspaces + **Turborepo**. We can split later; until then, everything lives here |
 | API | NestJS on the Fastify adapter |
-| Contracts | Zod schemas in `packages/contracts`, shared by API and web; typed client generated from them |
+| Contracts | Zod 4 schemas + **oRPC** contract router in `packages/contracts`, shared by API and web; typed client (`createApiClient`) and OpenAPI 3.1 from the same contract. oRPC replaced ts-rest (unmaintained, Zod 3 only) |
 | DB | PostgreSQL 17, Drizzle ORM + drizzle-kit migrations, PgBouncer |
 | Jobs/cache | Redis + BullMQ |
 | Web | React 19, Vite, TanStack Router/Query/Table, Tailwind |
@@ -104,7 +104,7 @@ docs/adr/      architecture decision records
    - duplicated tests at several layers for the same rule
 
    Test business rules, edge cases, permissions/scopes, tenancy and money/stock maths.
-4. **Tenancy test:** any new table or endpoint needs a test proving tenant A can't read or write tenant B's data.
+4. **Tenancy test:** any new table or endpoint needs a test proving tenant A can't read or write tenant B's data Use the `@hims/db/testing` helpers (`assertTenantIsolation`, `assertTableTenantIsolation`) with `startTestDatabase()` from `@hims/db/testing/containers`, asserting through `appUrl` (never the owner).
 5. Integration tests run against real Postgres (Testcontainers), never a mocked DB.
 6. **Coverage is visible on GitHub.** CI uploads Vitest coverage (lcov) and posts a coverage summary on every PR (Codecov or a coverage-comment action), and a README badge shows it. Coverage must not drop on a PR for `apps/api` service files. We gate on coverage of meaningful code, not on a vanity percentage.
 

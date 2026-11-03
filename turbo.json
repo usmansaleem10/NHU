@@ -43,7 +43,11 @@
         "SMS_*",
         "SESSION_*",
         "API_*",
-        "VITE_*"
+        "VITE_*",
+        "CURSOR_*",
+        "TRUST_PROXY_*",
+        "READINESS_*",
+        "APP_RELEASE"
       ]
     },
     "test": {

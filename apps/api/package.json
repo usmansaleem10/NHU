@@ -5,14 +5,39 @@
   "description": "HIMS API (NestJS on Fastify from F0-API-01)",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "dev": "NODE_ENV=${NODE_ENV:-development} node --env-file-if-exists=.env --watch -r @swc-node/register src/main.ts",
+    "start": "node --env-file-if-exists=.env dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist .turbo",
+    "test": "vitest run --project unit --coverage",
+    "test:int": "vitest run --project integration",
+    "clean": "rm -rf dist coverage .turbo",
     "lint": "eslint . --max-warnings=0"
   },
   "dependencies": {
-    "@hims/contracts": "workspace:*"
+    "@hims/contracts": "workspace:*",
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/platform-fastify": "^12.1.2",
+    "@orpc/contract": "^1.15.5",
+    "@orpc/nest": "^1.15.5",
+    "@orpc/openapi": "^1.15.5",
+    "@orpc/server": "^1.15.5",
+    "@orpc/zod": "^1.15.5",
+    "fastify": "^5.12.5",
+    "nestjs-pino": "^5.3.1",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@hims/config": "workspace:*"
+    "@hims/config": "workspace:*",
+    "@swc-node/register": "^1.12.1",
+    "@swc/core": "^1.16.13",
+    "@types/node": "^24.19.2",
+    "@vitest/coverage-v8": "^5.0.3",
+    "unplugin-swc": "^2.0.0",
+    "vitest": "^5.0.3"
   }
 }
