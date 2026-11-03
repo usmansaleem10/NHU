@@ -39,7 +39,7 @@ New work found along the way goes in as a new row with the next ID in that epic.
 | Language | TypeScript 6.0.x (`~6.0`), `strict` everywhere (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`). Not 7.x: typescript-eslint supports only `<6.1` |
 | Repo | **Monorepo** with pnpm workspaces + **Turborepo**. We can split later; until then, everything lives here |
 | API | NestJS on the Fastify adapter |
-| Contracts | Zod schemas in `packages/contracts`, shared by API and web; typed client generated from them |
+| Contracts | Zod 4 schemas + **oRPC** contract router in `packages/contracts`, shared by API and web; typed client (`createApiClient`) and OpenAPI 3.1 from the same contract. oRPC replaced ts-rest (unmaintained, Zod 3 only) |
 | DB | PostgreSQL 17, Drizzle ORM + drizzle-kit migrations, PgBouncer |
 | Jobs/cache | Redis + BullMQ |
 | Web | React 19, Vite, TanStack Router/Query/Table, Tailwind |
